@@ -1,0 +1,2 @@
+"""Rotas HTTP da aplicação."""
+
