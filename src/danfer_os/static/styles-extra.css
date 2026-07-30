@@ -1,0 +1,22 @@
+select,textarea{border:1px solid #cbd6df;border-radius:7px;padding:11px 12px;font:inherit;background:white}
+textarea{min-height:70px;resize:vertical}
+.compact{grid-template-columns:repeat(4,1fr)}
+.toolbar>div{flex:1}
+.action{border:0;background:#e9f3fb;color:var(--blue);border-radius:6px;padding:6px 9px;cursor:pointer;font-weight:700}
+.large{width:min(920px,95vw)}
+.quote-grid{grid-template-columns:repeat(4,1fr)}
+.item-editor{margin:0 26px;border:1px solid var(--line);border-radius:9px}
+.item-editor h3{padding:14px 20px 0;margin:0;font-size:13px}
+.dialog-error{color:var(--red);padding:0 26px;font-size:12px}
+#login-screen{position:fixed;z-index:20;inset:0;background:linear-gradient(135deg,#04111e,#0b3557);display:grid;place-items:center}
+#login-screen.hidden{display:none}
+.login-card{width:min(390px,90vw);background:white;border-radius:14px;padding:32px;box-shadow:0 24px 90px #0008}
+.login-card>p{color:var(--muted);margin-bottom:24px}
+.login-card label{display:block;font-size:11px;font-weight:700;color:#566778;margin:13px 0}
+.login-card input{display:block;width:100%;margin-top:6px}
+.login-card>button{width:100%;margin:9px 0 16px;border:0;border-radius:7px;padding:11px 18px;background:var(--blue);color:white;font-weight:700;cursor:pointer}
+.login-card>small{display:block;text-align:center;color:var(--muted)}
+.login-brand{padding:0;color:var(--ink)}
+#login-error{color:var(--red);text-align:center;font-size:12px;margin-top:12px}
+@media(max-width:850px){.quote-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.quote-grid{grid-template-columns:1fr}.compact{grid-template-columns:repeat(2,1fr)}}

@@ -1,0 +1,9 @@
+{
+  "name": "Danfer Industrial OS",
+  "short_name": "Danfer OS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071a2e",
+  "theme_color": "#071a2e",
+  "description": "Gestão comercial e industrial integrada da Danfer"
+}

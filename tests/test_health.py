@@ -8,3 +8,10 @@ def test_health() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_web_interface() -> None:
+    response = TestClient(create_app()).get("/")
+
+    assert response.status_code == 200
+    assert "Danfer Industrial OS" in response.text

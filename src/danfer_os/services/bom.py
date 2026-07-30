@@ -89,6 +89,12 @@ class BomService:
         ]
         return candidates[-1] if candidates else None
 
+    def for_product(self, product_id: UUID) -> BillOfMaterials:
+        bom = self._for_product(product_id)
+        if bom is None:
+            raise BomNotFoundError(product_id)
+        return bom.model_copy(deep=True)
+
     def _assert_acyclic(self, product_id: UUID) -> None:
         def visit(part_id: UUID, path: set[UUID]) -> None:
             if part_id in path:

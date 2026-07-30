@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Danfer Industrial OS</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/styles-extra.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#071a2e">
+</head>
+<body>
+<aside>
+  <div class="brand"><b>D</b><span><strong>DANFER</strong><small>Industrial OS</small></span></div>
+  <nav>
+    <button class="active" data-view="dashboard">▦ <span>Dashboard</span></button>
+    <button data-view="crm">◎ <span>CRM / Clientes</span></button>
+    <button data-view="quotes">▧ <span>Orçamentos</span></button>
+    <button data-view="library">▤ <span>Biblioteca Técnica</span></button>
+    <button data-view="bom">⌘ <span>Estruturas BOM</span></button>
+    <button data-view="pcp">◫ <span>PCP</span></button>
+    <button data-view="integrations">⇄ <span>Integrações</span></button>
+    <button data-view="quality">◇ <span>Qualidade</span></button>
+    <button data-view="maintenance">⚙ <span>Manutenções</span></button>
+  </nav>
+  <a href="/docs" target="_blank">Documentação da API ↗</a>
+</aside>
+<main>
+  <header><div><p>OPERAÇÃO INDUSTRIAL</p><h1 id="title">Dashboard</h1></div><span id="status">● Verificando API</span></header>
+  <section id="dashboard" class="view active">
+    <div id="metrics" class="metrics"></div>
+    <div class="columns">
+      <article><h2>Próximas ordens</h2><div id="orders"></div></article>
+      <article><h2>Demanda de materiais</h2><div id="materials"></div></article>
+    </div>
+  </section>
+  <section id="library" class="view">
+    <div class="toolbar"><input id="search" placeholder="Pesquisar código, descrição, cliente ou material"><button id="new">+ Nova peça</button></div>
+    <article><div id="parts"></div></article>
+  </section>
+  <section id="crm" class="view">
+    <div class="toolbar"><input id="client-search" placeholder="Pesquisar nome, CNPJ/CPF ou contato"><button id="new-client">+ Novo cliente</button></div>
+    <article><div id="clients"></div></article>
+  </section>
+  <section id="quotes" class="view">
+    <div class="toolbar"><select id="quote-filter"><option value="">Todos os status</option><option value="em_elaboracao">Em elaboração</option><option value="enviado">Enviados</option><option value="em_negociacao">Em negociação</option><option value="aprovado">Aprovados</option><option value="perdido">Perdidos</option></select><button id="new-quote">+ Novo orçamento</button></div>
+    <div id="quote-summary" class="metrics compact"></div>
+    <article><div id="quotes-table"></div></article>
+  </section>
+  <section id="bom" class="view"><div class="hero"><p>ENGENHARIA</p><h2>Estruturas de produto</h2><span>Revisões e componentes das estruturas BOM.</span></div><article><div id="boms"></div></article></section>
+  <section id="pcp" class="view"><div class="hero"><p>PLANEJAMENTO</p><h2>Ordens de produção</h2><span>Prioridades, prazos e fluxo Kanban.</span></div><div id="kanban" class="kanban"></div></section>
+  <section id="integrations" class="view"><div class="columns"><article><h2>Pedidos importados</h2><div id="imports"></div></article><article><h2>Fila do ERP</h2><div id="erp"></div></article></div></section>
+  <section id="quality" class="view"><div class="toolbar"><div></div><button id="new-quality">+ Nova ocorrência</button></div><article><div id="quality-table"></div></article></section>
+  <section id="maintenance" class="view"><div class="toolbar"><div></div><button id="new-maintenance">+ Nova manutenção</button></div><article><div id="maintenance-table"></div></article></section>
+</main>
+<div id="login-screen">
+  <form id="login-form" class="login-card"><div class="brand login-brand"><b>D</b><span><strong>DANFER</strong><small>Industrial OS 0.3.0</small></span></div><p>Acesse o ambiente de testes</p><label>Usuário<input name="username" value="admin" required></label><label>Senha<input name="password" value="Danfer@2026" type="password" required></label><button>Entrar</button><small>Primeiro acesso: admin / Danfer@2026</small><div id="login-error"></div></form>
+</div>
+<dialog id="dialog">
+  <form id="part-form">
+    <div class="modal-head"><div><p>BIBLIOTECA TÉCNICA</p><h2>Nova peça</h2></div><button type="button" class="close">×</button></div>
+    <div class="form-grid">
+      <label>Código Danfer<input name="danfer_code" required></label>
+      <label>Código do cliente<input name="customer_code"></label>
+      <label class="wide">Descrição<input name="title" required minlength="3"></label>
+      <label>Cliente<input name="customer"></label><label>Material<input name="material"></label>
+      <label>Espessura (mm)<input name="thickness_mm" type="number" step=".01"></label><label>Revisão<input name="revision" value="A"></label>
+      <label class="wide">URL do desenho<input name="file_url" type="url" value="https://docs.danfer.com/desenho.pdf" required></label>
+    </div>
+    <input type="hidden" name="category" value="desenho"><div id="error"></div>
+    <footer><button type="button" class="cancel close">Cancelar</button><button>Salvar peça</button></footer>
+  </form>
+</dialog>
+<dialog id="client-dialog"><form id="client-form"><div class="modal-head"><div><p>CRM</p><h2>Novo cliente</h2></div><button type="button" class="close-client">×</button></div><div class="form-grid"><label class="wide">Razão social / Nome<input name="name" required></label><label>CNPJ / CPF<input name="document"></label><label>Contato<input name="contact"></label><label>E-mail<input name="email" type="email"></label><label>Telefone<input name="phone"></label><label>Condição de pagamento<input name="payment_terms" value="28 dias"></label><label>Frete padrão<select name="freight_type"><option>FOB</option><option>CIF</option><option value="retira_danfer">Retira na Danfer</option></select></label><label>Responsável pelo frete<select name="freight_payer"><option value="cliente">Cliente</option><option value="danfer">Danfer</option></select></label><label class="wide">Endereço<input name="address"></label></div><div class="dialog-error"></div><footer><button type="button" class="cancel close-client">Cancelar</button><button>Salvar cliente</button></footer></form></dialog>
+<dialog id="quote-dialog" class="large"><form id="quote-form"><div class="modal-head"><div><p>COMERCIAL</p><h2>Novo orçamento</h2></div><button type="button" class="close-quote">×</button></div><div class="form-grid quote-grid"><label>Tipo<select name="type"><option value="venda">Venda</option><option value="servico">Serviço</option></select></label><label>Cliente<select name="client_id" id="quote-client" required></select></label><label>Solicitante<input name="requester"></label><label>Validade<input name="valid_until" type="date" required></label><label>Margem (%)<input name="margin_percent" type="number" value="25" step=".1"></label><label>IPI (%)<input name="ipi_percent" type="number" value="0" step=".1"></label><label>Entrega prevista<input name="expected_delivery" type="date"></label><label>Pagamento<input name="payment_terms" value="28 dias"></label></div><div class="item-editor"><h3>Item do orçamento</h3><div class="form-grid quote-grid"><label>Código<input name="item_code" required></label><label>Descrição<input name="item_description" required></label><label>Quantidade<input name="item_quantity" type="number" value="1" step=".01" required></label><label>Material<input name="item_material"></label><label>Espessura (mm)<input name="item_thickness" type="number" step=".01"></label><label>Peso líquido (kg)<input name="item_weight" type="number" value="0" step=".001"></label><label>Preço material (R$/kg)<input name="item_material_price" type="number" value="0" step=".01"></label><label>Aproveitamento (%)<input name="item_utilization" type="number" value="80" step=".1"></label><label>Tempo corte (min)<input name="cut_minutes" type="number" value="0" step=".1"></label><label>Valor hora corte<input name="cut_rate" type="number" value="180" step=".01"></label><label>Tempo dobra (min)<input name="bend_minutes" type="number" value="0" step=".1"></label><label>Valor hora dobra<input name="bend_rate" type="number" value="120" step=".01"></label></div></div><div class="form-grid"><label class="wide">Observações<textarea name="observations"></textarea></label></div><div class="dialog-error"></div><footer><button type="button" class="cancel close-quote">Cancelar</button><button>Calcular e salvar</button></footer></form></dialog>
+<dialog id="quality-dialog"><form id="quality-form"><div class="modal-head"><div><p>QUALIDADE</p><h2>Nova ocorrência</h2></div><button type="button" class="close-quality">×</button></div><div class="form-grid"><label>Tipo<select name="type"><option value="retrabalho">Retrabalho</option><option value="refugo">Refugo</option><option value="nao_conformidade">Não conformidade</option><option value="reclamacao_cliente">Reclamação</option></select></label><label>OP<input name="production_order"></label><label class="wide">Descrição<input name="description" required></label><label>Responsável<input name="responsible"></label><label>Custo<input name="cost" type="number" value="0" step=".01"></label></div><footer><button type="button" class="cancel close-quality">Cancelar</button><button>Registrar</button></footer></form></dialog>
+<dialog id="maintenance-dialog"><form id="maintenance-form"><div class="modal-head"><div><p>MANUTENÇÃO</p><h2>Nova ordem</h2></div><button type="button" class="close-maintenance">×</button></div><div class="form-grid"><label>Equipamento<input name="equipment" required></label><label>Tipo<select name="type"><option value="preventiva">Preventiva</option><option value="corretiva">Corretiva</option><option value="inspecao">Inspeção</option></select></label><label class="wide">Descrição<input name="description" required></label><label>Data programada<input name="scheduled_date" type="date"></label><label>Responsável<input name="responsible"></label></div><footer><button type="button" class="cancel close-maintenance">Cancelar</button><button>Registrar</button></footer></form></dialog>
+<script src="/app.js"></script>
+</body>
+</html>

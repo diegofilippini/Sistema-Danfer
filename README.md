@@ -1,5 +1,35 @@
 # Danfer Industrial OS
 
+## Versões para teste
+
+- **Web:** execute `INICIAR_WEB.bat` e abra `http://127.0.0.1:8000`.
+- **Windows portátil:** execute `Danfer Industrial OS.exe`; o navegador será
+  aberto automaticamente.
+
+A versão atual é a `0.3.0`, com interface responsiva, persistência e API integrada.
+
+### Acesso para testes
+
+- Usuário: `admin`
+- Senha: `Danfer@2026`
+
+Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
+de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
+
+## Versão 0.3.0 — Aplicação consolidada
+
+- CRM e cadastro de clientes;
+- orçamento de venda e serviço;
+- custos de matéria-prima, processos, terceiros e indiretos;
+- margem, IPI e preparação para CBS/IBS;
+- revisões, negociação, aprovação e proposta em PDF;
+- análise geométrica de DXF e sugestão NcAv;
+- regras de nesting e perdas configuráveis;
+- Biblioteca Técnica, BOM, PCP e integrações;
+- Qualidade, Manutenção, Auditoria e notificações;
+- usuários e perfis;
+- PWA preparada para instalação.
+
 API central dos módulos industriais da Danfer.
 
 ## Sprint 054 — Importador Inteligente

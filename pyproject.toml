@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "danfer-industrial-os"
-version = "0.2.0"
+version = "0.3.0"
 description = "Sistema operacional industrial da Danfer"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,6 +13,8 @@ dependencies = [
     "uvicorn[standard]>=0.30,<1",
     "openpyxl>=3.1,<4",
     "xlrd>=2,<3",
+    "reportlab>=4,<6",
+    "ezdxf>=1.4,<2",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +29,6 @@ testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+danfer_os = ["static/*"]

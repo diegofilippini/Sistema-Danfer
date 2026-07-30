@@ -1,5 +1,7 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+import os
 
 from danfer_os.routers.health import router as health_router
 from danfer_os.routers.technical_library import create_router
@@ -14,13 +16,26 @@ from danfer_os.services.dashboard import DashboardService
 from danfer_os.routers.importer import create_router as create_importer_router
 from danfer_os.services.importer import ImporterService
 from danfer_os.services.technical_library import TechnicalLibrary
+from danfer_os.routers.commercial import create_router as create_commercial_router
+from danfer_os.services.commercial import CommercialService
+from danfer_os.routers.operations import create_router as create_operations_router
+from danfer_os.services.operations import OperationsService
+from danfer_os.routers.auth import create_router as create_auth_router
+from danfer_os.services.auth import AuthService
+from danfer_os.routers.workflows import create_router as create_workflows_router
+from danfer_os.routers.engineering import create_router as create_engineering_router
+from danfer_os.services.engineering import EngineeringService
+from danfer_os.demo import seed_demo
 
 
-def create_app(library: TechnicalLibrary | None = None) -> FastAPI:
-    library = library or TechnicalLibrary(Path("data/technical-library.json"))
+def create_app(
+    library: TechnicalLibrary | None = None,
+    data_dir: Path = Path("data"),
+) -> FastAPI:
+    library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.2.0",
+        version="0.3.0",
         description="API central para os módulos industriais da Danfer.",
     )
     app.include_router(health_router, prefix="/api/v1")
@@ -32,6 +47,16 @@ def create_app(library: TechnicalLibrary | None = None) -> FastAPI:
     app.include_router(create_bom_router(bom_service), prefix="/api/v1")
     pcp_service = PcpService(library, bom_service)
     integration_service = IntegrationService(library)
+    commercial_service = CommercialService(data_dir / "commercial.json")
+    operations_service = OperationsService(data_dir / "operations.json")
+    if os.getenv("DANFER_SEED_DEMO") == "1":
+        seed_demo(
+            library,
+            bom_service,
+            pcp_service,
+            commercial_service,
+            operations_service,
+        )
     app.include_router(create_pcp_router(pcp_service), prefix="/api/v1")
     app.include_router(
         create_integrations_router(integration_service), prefix="/api/v1"
@@ -51,6 +76,33 @@ def create_app(library: TechnicalLibrary | None = None) -> FastAPI:
         create_importer_router(ImporterService(library)),
         prefix="/api/v1",
     )
+    app.include_router(
+        create_commercial_router(commercial_service),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        create_operations_router(operations_service),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        create_auth_router(AuthService(data_dir / "auth.json")),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        create_workflows_router(
+            commercial_service,
+            library,
+            bom_service,
+            pcp_service,
+        ),
+        prefix="/api/v1",
+    )
+    app.include_router(
+        create_engineering_router(EngineeringService()),
+        prefix="/api/v1",
+    )
+    static_dir = Path(__file__).with_name("static")
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
     return app
 
 
