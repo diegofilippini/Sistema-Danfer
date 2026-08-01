@@ -3,10 +3,11 @@
 ## Versões para teste
 
 - **Web:** execute `INICIAR_WEB.bat` e abra `http://127.0.0.1:8000`.
-- **Windows portátil:** execute `Danfer Industrial OS.exe`; o navegador será
-  aberto automaticamente.
+- **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
+  preparado e o navegador é aberto automaticamente.
 
-A versão atual é a `0.3.0`, com interface responsiva, persistência e API integrada.
+A versão consolidada é a `1.0.0`, com interface responsiva, persistência local,
+controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
 
@@ -16,7 +17,7 @@ A versão atual é a `0.3.0`, com interface responsiva, persistência e API inte
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
 
-## Versão 0.3.0 — Aplicação consolidada
+## Versão 1.0.0 — Consolidação por fases
 
 - CRM e cadastro de clientes;
 - orçamento de venda e serviço;
@@ -29,6 +30,12 @@ de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenç�
 - Qualidade, Manutenção, Auditoria e notificações;
 - usuários e perfis;
 - PWA preparada para instalação.
+
+Também foram consolidados o editor multi-itens, custeio de serviço sem matéria-prima,
+calandra por tempo/peso, catálogo de materiais e operações ERP, registro de DXF na
+Biblioteca Técnica, PCP diário com capacidade/calendário, custos estimados versus
+realizados, faturamento Danfer/DF, Central de Solicitações e preparação de mensagens
+para WhatsApp/e-mail.
 
 API central dos módulos industriais da Danfer.
 

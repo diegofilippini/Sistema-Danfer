@@ -1,4 +1,5 @@
 @echo off
+set PYTHONUTF8=1
 title Danfer Industrial OS Web
 cd /d "%~dp0"
 if not exist ".venv\Scripts\python.exe" (

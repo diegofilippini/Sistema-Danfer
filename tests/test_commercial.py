@@ -67,6 +67,8 @@ def test_quote_calculation_revision_status_and_pdf(tmp_path: Path) -> None:
     assert quote["number"].startswith("ORC-")
     assert quote["items"][0]["material_cost"] == 62.5
     assert quote["items"][0]["process_cost"] == 57.5
+    expected_ipi = round(quote["subtotal"] * 0.05, 2)
+    assert quote["taxes"] == expected_ipi
     assert quote["total"] > quote["subtotal"]
     assert quote["gross_profit"] > 0
 
@@ -126,6 +128,8 @@ def test_service_ignores_material_and_supports_weight_pricing_and_small_batch(tm
     item = response.json()["items"][0]
     assert item["material_cost"] == 0
     assert item["process_cost"] == 82.5
+    assert response.json()["taxes"] == 0
+    assert response.json()["total"] == response.json()["subtotal"]
 
 
 def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:

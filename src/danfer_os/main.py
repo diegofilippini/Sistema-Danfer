@@ -43,7 +43,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.7.0",
+        version="1.0.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")

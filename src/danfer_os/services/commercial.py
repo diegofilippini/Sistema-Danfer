@@ -214,9 +214,8 @@ class CommercialService:
         ]
         subtotal = sum(item.total_price for item in items)
         taxable = max(subtotal + data.freight_value - data.discount_value, 0)
-        taxes = taxable * (
-            data.ipi_percent + data.cbs_percent + data.ibs_percent
-        ) / 100
+        applied_tax_percent = data.ipi_percent if data.type.value == "venda" else 0
+        taxes = taxable * applied_tax_percent / 100
         total_cost = sum(item.total_cost * item.quantity for item in items)
         total = taxable + taxes
         return Quote(

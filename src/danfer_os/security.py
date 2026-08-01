@@ -17,6 +17,14 @@ ROLE_PREFIXES = {
     "/api/v1/pcp": {UserRole.ADMIN, UserRole.PCP, UserRole.PRODUCTION},
     "/api/v1/quality": {UserRole.ADMIN, UserRole.QUALITY, UserRole.PRODUCTION},
     "/api/v1/maintenance": {UserRole.ADMIN, UserRole.PRODUCTION},
+    "/api/v1/catalogs": {UserRole.ADMIN, UserRole.ENGINEERING, UserRole.COMMERCIAL},
+    "/api/v1/technical-library": {UserRole.ADMIN, UserRole.ENGINEERING, UserRole.COMMERCIAL, UserRole.PCP, UserRole.VIEWER},
+    "/api/v1/boms": {UserRole.ADMIN, UserRole.ENGINEERING, UserRole.PCP},
+    "/api/v1/integrations": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP},
+    "/api/v1/billing": {UserRole.ADMIN, UserRole.COMMERCIAL},
+    "/api/v1/requests": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP, UserRole.ENGINEERING, UserRole.PRODUCTION, UserRole.QUALITY},
+    "/api/v1/communications": {UserRole.ADMIN, UserRole.COMMERCIAL},
+    "/api/v1/audit": {UserRole.ADMIN},
 }
 
 

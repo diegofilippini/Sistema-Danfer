@@ -2,6 +2,8 @@ from io import BytesIO
 from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
+from reportlab.graphics.barcode.qr import QrCodeWidget
+from reportlab.graphics.shapes import Drawing
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -61,6 +63,18 @@ def _header_footer(canvas: Canvas, document: SimpleDocTemplate) -> None:
 
 def _label_value(label: str, value: str, styles: dict) -> Paragraph:
     return Paragraph(f"<font color='#66798A' size='7'><b>{escape(label.upper())}</b></font><br/>{escape(value or '-')} ", styles["field"])
+
+
+def _whatsapp_qr() -> Drawing:
+    widget = QrCodeWidget("https://wa.me/5554991525973")
+    x1, y1, x2, y2 = widget.getBounds()
+    size = 16 * mm
+    drawing = Drawing(
+        size, size,
+        transform=[size / (x2 - x1), 0, 0, size / (y2 - y1), 0, 0],
+    )
+    drawing.add(widget)
+    return drawing
 
 
 def build_proposal_pdf(quote: Quote, client: Client) -> bytes:
@@ -133,11 +147,15 @@ def build_proposal_pdf(quote: Quote, client: Client) -> bytes:
     cbs = tax_base * quote.cbs_percent / 100
     ibs = tax_base * quote.ibs_percent / 100
     ipi = tax_base * quote.ipi_percent / 100
-    financial = Table([
-        ["Subtotal", brl(quote.subtotal)], ["Frete", brl(quote.freight_value)], ["Desconto", f"- {brl(quote.discount_value)}"],
-        [f"CBS ({quote.cbs_percent:g}%)", brl(cbs)], [f"IBS ({quote.ibs_percent:g}%)", brl(ibs)], [f"IPI ({quote.ipi_percent:g}%)", brl(ipi)],
-        [Paragraph("TOTAL GERAL", styles["center"]), Paragraph(brl(quote.total), styles["total"])],
-    ], colWidths=[45 * mm, 42 * mm], hAlign="RIGHT")
+    financial_rows = [["Subtotal", brl(quote.subtotal)]]
+    if quote.freight_value:
+        financial_rows.append(["Frete", brl(quote.freight_value)])
+    if quote.discount_value:
+        financial_rows.append(["Desconto", f"- {brl(quote.discount_value)}"])
+    if quote.type.value == "venda" and quote.ipi_percent:
+        financial_rows.append([f"IPI ({quote.ipi_percent:g}%)", brl(ipi)])
+    financial_rows.append([Paragraph("TOTAL GERAL", styles["center"]), Paragraph(brl(quote.total), styles["total"])])
+    financial = Table(financial_rows, colWidths=[45 * mm, 42 * mm], hAlign="RIGHT")
     financial.setStyle(TableStyle([
         ("ALIGN", (0, 0), (-1, -1), "RIGHT"), ("FONTNAME", (0, 0), (-1, -2), "Helvetica"),
         ("FONTSIZE", (0, 0), (-1, -2), 8), ("LINEBELOW", (0, 0), (-1, -2), 0.35, LINE),
@@ -146,13 +164,17 @@ def build_proposal_pdf(quote: Quote, client: Client) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 2 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 2 * mm),
     ]))
     notes = quote.observations or "Proposta sujeita as condicoes comerciais apresentadas neste documento."
-    conditions = f"Validade: {quote.valid_until:%d/%m/%Y}. Pagamento: {quote.payment_terms or client.payment_terms}. Frete: {quote.freight_type.value}."
+    conditions = f"Validade: {quote.valid_until:%d/%m/%Y}. Pagamento: {quote.payment_terms or client.payment_terms}. Frete: {quote.freight_type.value}. Informe se a operacao e industrializacao ou uso e consumo. Empresa enquadrada no Lucro Presumido - NCM padrao 72119090."
+    contact = Table([[
+        _whatsapp_qr(),
+        Paragraph("<b>WHATSAPP</b><br/><font size='6'>(54) 99152-5973<br/>(54) 3027-4715<br/>www.danfer.ind.br</font>", styles["body"]),
+    ]], colWidths=[17 * mm, 22 * mm])
     footer_info = Table([[
         Paragraph(f"<b>OBSERVACOES GERAIS</b><br/><font size='7'>{escape(notes)}</font>", styles["body"]),
         Paragraph(f"<b>CONDICOES COMERCIAIS</b><br/><font size='7'>{escape(conditions)}</font>", styles["body"]),
         Paragraph(f"<b>ELABORADO POR</b><br/><font size='7'>{escape(quote.prepared_by)}</font>", styles["body"]),
-        Paragraph("<b>CONTATO</b><br/><font size='7'>comercial@danfer.ind.br</font>", styles["body"]),
-    ]], colWidths=[55 * mm, 55 * mm, 34 * mm, 35 * mm])
+        contact,
+    ]], colWidths=[52 * mm, 58 * mm, 30 * mm, 39 * mm])
     footer_info.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.5, LINE), ("INNERGRID", (0, 0), (-1, -1), 0.35, LINE),
         ("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 3 * mm),
