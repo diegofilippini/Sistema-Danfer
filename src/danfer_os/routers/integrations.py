@@ -49,9 +49,9 @@ def create_router(service: IntegrationService) -> APIRouter:
         return service.list_events(event_status)
 
     @router.post("/erp/events/{event_id}/ack", response_model=ErpEvent)
-    def acknowledge(event_id: UUID, succeeded: bool = True) -> ErpEvent:
+    def acknowledge(event_id: UUID, succeeded: bool = True, error: str = "") -> ErpEvent:
         try:
-            return service.acknowledge_event(event_id, succeeded)
+            return service.acknowledge_event(event_id, succeeded, error)
         except LookupError as error:
             raise HTTPException(status_code=404, detail="evento não encontrado") from error
 

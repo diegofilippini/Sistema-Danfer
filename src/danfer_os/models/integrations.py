@@ -3,6 +3,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+from danfer_os.models.coordination import CompanyUnit
 
 
 class ImportStatus(StrEnum):
@@ -13,14 +14,17 @@ class ImportStatus(StrEnum):
 
 class ExternalOrderItem(BaseModel):
     customer_code: str = Field(min_length=1, max_length=50)
+    erp_product_code: str = Field(default="", max_length=50)
     quantity: float = Field(gt=0)
     unit: str = Field(default="un", min_length=1, max_length=20)
 
 
 class ExternalOrderCreate(BaseModel):
+    company_unit: CompanyUnit = CompanyUnit.DANFER
     source: str = Field(default="api", min_length=2, max_length=40)
     external_id: str = Field(min_length=1, max_length=100)
     customer: str = Field(min_length=2, max_length=160)
+    erp_customer_code: str = Field(default="", max_length=50)
     items: list[ExternalOrderItem] = Field(min_length=1)
     notes: str = Field(default="", max_length=1000)
 
@@ -43,6 +47,10 @@ class ErpEvent(BaseModel):
     entity: str
     entity_id: UUID
     action: str
+    company_unit: CompanyUnit = CompanyUnit.DANFER
+    payload: dict[str, object] = Field(default_factory=dict)
     status: ErpEventStatus = ErpEventStatus.PENDING
     attempts: int = 0
+    last_error: str = ""
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

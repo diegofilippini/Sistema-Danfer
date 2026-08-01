@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import json
+from pathlib import Path
 from uuid import UUID
 from xml.etree import ElementTree
 
@@ -23,11 +26,33 @@ class DuplicateExternalOrderError(ValueError):
 
 
 class IntegrationService:
-    def __init__(self, library: TechnicalLibrary) -> None:
+    def __init__(self, library: TechnicalLibrary, storage_path: Path | None = None) -> None:
         self._library = library
         self._orders: dict[UUID, ImportedOrder] = {}
         self._external_keys: set[tuple[str, str]] = set()
         self._erp_events: dict[UUID, ErpEvent] = {}
+        self._storage_path = storage_path
+        self._load()
+
+    def _load(self) -> None:
+        if self._storage_path is None or not self._storage_path.exists():
+            return
+        payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
+        orders = [ImportedOrder.model_validate(item) for item in payload.get("orders", [])]
+        self._orders = {item.id: item for item in orders}
+        self._external_keys = {(item.source.casefold(), item.external_id.casefold()) for item in orders}
+        events = [ErpEvent.model_validate(item) for item in payload.get("erp_events", [])]
+        self._erp_events = {item.id: item for item in events}
+
+    def _save(self) -> None:
+        if self._storage_path is None:
+            return
+        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self._storage_path.write_text(json.dumps({
+            "version": 1,
+            "orders": [item.model_dump(mode="json") for item in self._orders.values()],
+            "erp_events": [item.model_dump(mode="json") for item in self._erp_events.values()],
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def import_order(self, data: ExternalOrderCreate) -> ImportedOrder:
         key = (data.source.casefold(), data.external_id.casefold())
@@ -50,8 +75,15 @@ class IntegrationService:
         )
         self._orders[order.id] = order
         self._external_keys.add(key)
-        event = ErpEvent(entity="pedido", entity_id=order.id, action="importar")
+        event = ErpEvent(
+            entity="pedido", entity_id=order.id, action="importar",
+            company_unit=order.company_unit,
+            payload={"external_id": order.external_id, "customer": order.customer,
+                     "erp_customer_code": order.erp_customer_code,
+                     "items": [item.model_dump(mode="json") for item in order.items]},
+        )
         self._erp_events[event.id] = event
+        self._save()
         return order.model_copy(deep=True)
 
     def import_xml(self, xml: str) -> ImportedOrder:
@@ -96,7 +128,7 @@ class IntegrationService:
             events = (event for event in events if event.status == status)
         return [event.model_copy(deep=True) for event in events]
 
-    def acknowledge_event(self, event_id: UUID, succeeded: bool) -> ErpEvent:
+    def acknowledge_event(self, event_id: UUID, succeeded: bool, error: str = "") -> ErpEvent:
         current = self._erp_events.get(event_id)
         if current is None:
             raise LookupError(event_id)
@@ -104,7 +136,10 @@ class IntegrationService:
             update={
                 "status": ErpEventStatus.SENT if succeeded else ErpEventStatus.FAILED,
                 "attempts": current.attempts + 1,
+                "last_error": "" if succeeded else error,
+                "updated_at": datetime.now(timezone.utc),
             }
         )
         self._erp_events[event_id] = updated
+        self._save()
         return updated.model_copy(deep=True)

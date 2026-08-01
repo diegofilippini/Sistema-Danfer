@@ -30,6 +30,8 @@ from danfer_os.routers.system import create_router as create_system_router
 from danfer_os.security import security_middleware
 from danfer_os.routers.catalogs import create_router as create_catalogs_router
 from danfer_os.services.catalogs import CatalogService
+from danfer_os.routers.coordination import create_router as create_coordination_router
+from danfer_os.services.coordination import CoordinationService
 
 
 def create_app(
@@ -41,7 +43,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.6.0",
+        version="0.7.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -59,7 +61,9 @@ def create_app(
         bom_service,
         None if isolated_test_mode else data_dir / "pcp.json",
     )
-    integration_service = IntegrationService(library)
+    integration_service = IntegrationService(
+        library, None if isolated_test_mode else data_dir / "integrations.json"
+    )
     commercial_service = CommercialService(data_dir / "commercial.json")
     operations_service = OperationsService(data_dir / "operations.json")
     catalog_service = CatalogService(data_dir / "catalogs.json")
@@ -117,6 +121,12 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")
+    app.include_router(
+        create_coordination_router(CoordinationService(
+            None if isolated_test_mode else data_dir / "coordination.json"
+        )),
+        prefix="/api/v1",
+    )
     static_dir = Path(__file__).with_name("static")
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
     return app

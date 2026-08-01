@@ -3,6 +3,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
+from danfer_os.models.coordination import CompanyUnit
 
 
 class FreightType(StrEnum):
@@ -123,6 +124,7 @@ class QuoteItem(QuoteItemCreate):
 
 class QuoteCreate(BaseModel):
     type: QuoteType
+    billing_unit: CompanyUnit = CompanyUnit.DANFER
     client_id: UUID
     requester: str = Field(default="", max_length=120)
     prepared_by: str = Field(default="Equipe Comercial Danfer", max_length=120)
@@ -145,6 +147,7 @@ class QuoteCreate(BaseModel):
 
 
 class QuoteUpdate(BaseModel):
+    billing_unit: CompanyUnit | None = None
     requester: str | None = Field(default=None, max_length=120)
     prepared_by: str | None = Field(default=None, max_length=120)
     valid_until: date | None = None

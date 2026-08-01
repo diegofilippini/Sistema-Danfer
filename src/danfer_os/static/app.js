@@ -159,13 +159,22 @@ async function integrations() {
     req("/integrations/orders"), req("/integrations/erp/events")
   ]);
   $("#imports").innerHTML = table(
-    ["Origem","Pedido","Cliente","Status"],
-    orders.map(item => `<tr><td>${esc(item.source)}</td><td>${esc(item.external_id)}</td><td>${esc(item.customer)}</td><td>${pill(item.status)}</td></tr>`)
+    ["Empresa","Origem","Pedido","Cliente","Status"],
+    orders.map(item => `<tr><td>${esc(item.company_unit).toUpperCase()}</td><td>${esc(item.source)}</td><td>${esc(item.external_id)}</td><td>${esc(item.customer)}</td><td>${pill(item.status)}</td></tr>`)
   );
   $("#erp").innerHTML = table(
-    ["Entidade","Ação","Tent.","Status"],
-    events.map(item => `<tr><td>${esc(item.entity)}</td><td>${esc(item.action)}</td><td>${item.attempts}</td><td>${pill(item.status)}</td></tr>`)
+    ["Empresa","Entidade","Ação","Tent.","Status / erro"],
+    events.map(item => `<tr><td>${esc(item.company_unit).toUpperCase()}</td><td>${esc(item.entity)}</td><td>${esc(item.action)}</td><td>${item.attempts}</td><td>${pill(item.status)}<br><small>${esc(item.last_error)}</small></td></tr>`)
   );
+}
+
+async function coordination() {
+  const [profiles, requests, messages] = await Promise.all([
+    req("/billing/profiles"), req("/requests"), req("/communications/messages")
+  ]);
+  $("#billing-profiles").innerHTML = profiles.map(item => `<div class="metric"><b>${esc(item.unit).toUpperCase()}</b><span>${esc(item.legal_name)}${item.erp_company_code ? " · ERP " + esc(item.erp_company_code) : ""}</span></div>`).join("");
+  $("#requests-table").innerHTML = table(["Número","Assunto","Destino","Prioridade","Status"], requests.map(item => `<tr><td><b>${esc(item.number)}</b><br><small>${esc(item.company_unit).toUpperCase()}</small></td><td>${esc(item.subject)}<br><small>${esc(item.requester)}</small></td><td>${esc(item.target_department)}</td><td>${pill(item.priority)}</td><td>${pill(item.status)}</td></tr>`));
+  $("#messages-table").innerHTML = table(["Canal","Destinatário","Mensagem","Status","Ação"], messages.map(item => `<tr><td>${esc(item.channel)}</td><td>${esc(item.recipient)}</td><td>${esc(item.body)}</td><td>${pill(item.status)}</td><td>${item.action_url ? `<a class="action" href="${esc(item.action_url)}" target="_blank" rel="noopener">Abrir</a>` : ""}</td></tr>`));
 }
 
 async function quality() {
@@ -188,7 +197,7 @@ async function maintenance() {
   );
 }
 
-const loaders = {dashboard, crm, quotes, library, engineering, bom, pcp, integrations, quality, maintenance};
+const loaders = {dashboard, crm, quotes, library, engineering, bom, pcp, integrations, coordination, quality, maintenance};
 document.querySelectorAll("nav button").forEach(button => {
   button.onclick = async () => {
     document.querySelectorAll("nav button,.view").forEach(item => item.classList.remove("active"));
@@ -213,6 +222,8 @@ dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
 dialogControls("#new-material", "#material-dialog", ".close-material");
 dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
 dialogControls("#new-work-log", "#work-log-dialog", ".close-work-log");
+dialogControls("#new-request", "#request-dialog", ".close-request");
+dialogControls("#new-message", "#message-dialog", ".close-message");
 
 $("#refresh-capacity").onclick = pcp;
 $("#new-work-log").addEventListener("click", async () => {
@@ -340,7 +351,7 @@ $("#quote-form").onsubmit = async event => {
     return;
   }
   const payload = {
-    type:form.type, client_id:form.client_id, requester:form.requester,
+    type:form.type, billing_unit:form.billing_unit, client_id:form.client_id, requester:form.requester,
     prepared_by:form.prepared_by,
     valid_until:form.valid_until, expected_delivery:form.expected_delivery || null,
     payment_terms:form.payment_terms, freight_type:form.freight_type,
@@ -382,6 +393,25 @@ $("#work-log-form").onsubmit = async event => {
   try {
     await req(`/pcp/orders/${orderId}/logs`, {method:"POST", body:JSON.stringify(data)});
     $("#work-log-dialog").close(); event.target.reset(); await pcp();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
+};
+
+$("#request-form").onsubmit = async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  if (!data.due_date) delete data.due_date;
+  try {
+    await req("/requests", {method:"POST", body:JSON.stringify(data)});
+    $("#request-dialog").close(); event.target.reset(); await coordination();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
+};
+
+$("#message-form").onsubmit = async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  try {
+    await req("/communications/messages", {method:"POST", body:JSON.stringify(data)});
+    $("#message-dialog").close(); event.target.reset(); await coordination();
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 

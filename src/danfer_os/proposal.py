@@ -99,7 +99,7 @@ def build_proposal_pdf(quote: Quote, client: Client) -> bytes:
     ]))
     commercial = Table([
         [_label_value("Cliente", client.name, styles), _label_value("Condicao de pagamento", quote.payment_terms or client.payment_terms, styles), _label_value("Natureza da operacao", quote.nature_operation, styles)],
-        [_label_value("Solicitante", quote.requester or client.contact, styles), _label_value("Frete", f"{quote.freight_type.value} - por conta de {quote.freight_payer.value}", styles), _label_value("Regime do cliente", client.tax_regime, styles)],
+        [_label_value("Solicitante", quote.requester or client.contact, styles), _label_value("Faturamento", quote.billing_unit.value.upper(), styles), _label_value("Frete", f"{quote.freight_type.value} - por conta de {quote.freight_payer.value}", styles)],
         [_label_value("Entrega prevista", quote.expected_delivery.strftime("%d/%m/%Y") if quote.expected_delivery else "A combinar", styles), _label_value("Local de entrega", client.address or "A combinar", styles), _label_value("Cenario tributario", quote.tax_scenario, styles)],
     ], colWidths=[60 * mm, 60 * mm, 59 * mm])
     commercial.setStyle(TableStyle([
