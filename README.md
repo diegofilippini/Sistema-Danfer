@@ -6,7 +6,7 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.2.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.3.0`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
@@ -17,7 +17,11 @@ controle de acesso por perfil e API integrada.
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
 
-## Versão 1.2.0 — Consolidação por fases
+## Versão 1.3.0 — Consolidação por fases
+
+Inclui custeio avançado por chapa/faixa, troca obrigatória da senha inicial e um
+gerador determinístico de 20 orçamentos aprovados para homologação do fluxo
+Comercial → ERP → PCP e da comparação entre custos estimados e realizados.
 
 - CRM e cadastro de clientes;
 - orçamento de venda e serviço;

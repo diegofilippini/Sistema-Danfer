@@ -128,6 +128,8 @@ def build_proposal_pdf(quote: Quote, client: Client) -> bytes:
         processes = ", ".join(process.name for process in item.processes) or "Fornecimento"
         if item.notes:
             processes += f"<br/><font color='#66798A'>{escape(item.notes)}</font>"
+        if item.costing_warnings:
+            processes += "<br/><font color='#B06A00'>" + escape(" | ".join(item.costing_warnings)) + "</font>"
         margin = item.margin_percent if item.margin_percent is not None else quote.margin_percent
         rows.append([
             Paragraph(f"<b>{escape(item.code)}</b>", styles["body"]),

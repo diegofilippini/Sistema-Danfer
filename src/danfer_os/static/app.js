@@ -11,6 +11,11 @@ let pendingQuoteItems = [];
 let lastDxfDrafts = [];
 let quoteMaterialCatalog = [];
 
+function requirePasswordChange(user) {
+  if (user.must_change_password && !$("#password-dialog").open) $("#password-dialog").showModal();
+  return user.must_change_password;
+}
+
 async function req(path, options = {}) {
   const response = await fetch(api + path, {
     credentials: "same-origin",
@@ -475,8 +480,23 @@ $("#login-form").onsubmit = async event => {
     const login = await req("/auth/login", {method:"POST", body:JSON.stringify(data)});
     $("#login-screen").classList.add("hidden");
     $("#status").textContent = `● ${login.user.name}`;
+    if (requirePasswordChange(login.user)) return;
     await dashboard();
   } catch (error) { $("#login-error").textContent = error.message; }
+};
+
+$("#password-form").onsubmit = async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  if (data.new_password !== data.confirm_password) {
+    event.target.querySelector(".dialog-error").textContent = "A confirmação da nova senha não confere.";
+    return;
+  }
+  delete data.confirm_password;
+  try {
+    await req("/auth/change-password", {method:"POST", body:JSON.stringify(data)});
+    $("#password-dialog").close(); event.target.reset(); await dashboard();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
 (async () => {
@@ -484,6 +504,7 @@ $("#login-form").onsubmit = async event => {
     const user = await req("/auth/me");
     $("#login-screen").classList.add("hidden");
     $("#status").textContent = `● ${user.name}`;
+    if (requirePasswordChange(user)) return;
     await dashboard();
   } catch {
     $("#status").textContent = "● Aguardando login";

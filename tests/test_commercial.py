@@ -141,3 +141,30 @@ def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:
     assert settings["default_sheet_width_mm"] == 1200
     assert settings["default_sheet_length_mm"] == 3000
     assert settings["alternative_minimum_gain_percent"] == 8
+
+
+def test_sheet_selection_strip_costing_gap_and_inox_warning(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    payload = quote_payload(customer["id"])
+    payload["items"] = [
+        {
+            "code": "ALT", "description": "Peça para chapa alternativa", "quantity": 6,
+            "material": "Aço carbono", "thickness_mm": 3, "width_mm": 700,
+            "length_mm": 750, "net_weight_kg": 4, "material_price_kg": 8,
+        },
+        {
+            "code": "FAIXA", "description": "Peça pequena em inox", "quantity": 1,
+            "material": "Aço inox", "thickness_mm": 2, "width_mm": 100,
+            "length_mm": 100, "net_weight_kg": 1, "material_price_kg": 20,
+        },
+    ]
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    alternative, strip = response.json()["items"]
+    assert alternative["selected_sheet_width_mm"] == 1500
+    assert alternative["costing_method"] == "nesting_retangular"
+    assert alternative["applied_gap_mm"] == 3
+    assert "chapa alternativa" in alternative["costing_warnings"][0]
+    assert strip["costing_method"] == "faixa_de_chapa"
+    assert any("riscos superficiais" in warning for warning in strip["costing_warnings"])

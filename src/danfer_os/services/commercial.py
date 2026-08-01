@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal, ROUND_HALF_UP
+import math
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -152,7 +153,69 @@ class CommercialService:
         compatible_item_count: int,
     ) -> QuoteItem:
         utilization = max(data.utilization_percent, 1)
-        material_consumption = data.net_weight_kg / (utilization / 100)
+        selected_width = selected_length = None
+        applied_gap = 0.0
+        costing_method = "aproveitamento_informado"
+        warnings: list[str] = []
+        if data.width_mm and data.length_mm and data.thickness_mm:
+            applied_gap = next((gap for limit, gap in self._settings.gap_rules if data.thickness_mm <= limit), self._settings.gap_rules[-1][1])
+
+            def sheet_metrics(width: float, length: float) -> tuple[int, float]:
+                usable_w = max(width - 2 * self._settings.sheet_edge_margin_mm, 0)
+                usable_l = max(length - 2 * self._settings.sheet_edge_margin_mm, 0)
+                orientations = [(data.width_mm, data.length_mm), (data.length_mm, data.width_mm)]
+                capacity = max(
+                    int(usable_w // (part_w + applied_gap)) * int(usable_l // (part_l + applied_gap))
+                    for part_w, part_l in orientations
+                )
+                if capacity <= 0:
+                    return 0, 0
+                sheets = math.ceil(data.quantity / capacity)
+                occupied = data.width_mm * data.length_mm * data.quantity
+                return capacity, occupied / (width * length * sheets) * 100
+
+            standard = (
+                self._settings.default_sheet_width_mm,
+                self._settings.default_sheet_length_mm,
+                *sheet_metrics(self._settings.default_sheet_width_mm, self._settings.default_sheet_length_mm),
+            )
+            alternative = (
+                self._settings.alternative_sheet_width_mm,
+                self._settings.alternative_sheet_length_mm,
+                *sheet_metrics(self._settings.alternative_sheet_width_mm, self._settings.alternative_sheet_length_mm),
+            )
+            chosen = standard
+            gain = ((alternative[3] - standard[3]) / standard[3] * 100) if standard[3] else (100 if alternative[2] else 0)
+            if (not standard[2] and alternative[2]) or gain >= self._settings.alternative_minimum_gain_percent:
+                chosen = alternative
+                warnings.append(f"chapa alternativa selecionada; ganho calculado {gain:.1f}%")
+            selected_width, selected_length, _, calculated_utilization = chosen
+            if calculated_utilization:
+                utilization = calculated_utilization
+                costing_method = "nesting_retangular"
+
+            if utilization < self._settings.strip_costing_threshold_percent and chosen[2]:
+                usable_length = selected_length - 2 * self._settings.sheet_edge_margin_mm
+                strip_options = []
+                for cross, along in ((data.width_mm, data.length_mm), (data.length_mm, data.width_mm)):
+                    per_strip = int(usable_length // (along + applied_gap))
+                    if per_strip:
+                        strips = math.ceil(data.quantity / per_strip)
+                        strip_options.append(strips * (cross + applied_gap) * usable_length / data.quantity)
+                if strip_options:
+                    billable_area_unit = min(strip_options)
+                    part_area = data.width_mm * data.length_mm
+                    material_consumption = data.net_weight_kg * max(billable_area_unit / part_area, 1)
+                    costing_method = "faixa_de_chapa"
+                else:
+                    material_consumption = data.net_weight_kg / (utilization / 100)
+            else:
+                material_consumption = data.net_weight_kg / (utilization / 100)
+        else:
+            calculated_utilization = None
+            material_consumption = data.net_weight_kg / (utilization / 100)
+        if self._settings.inox_warning_enabled and "inox" in data.material.casefold():
+            warnings.append(self._settings.inox_warning)
         large_part_loss = (
             data.quantity == 1
             and data.utilization_percent > self._settings.large_part_threshold_percent
@@ -202,6 +265,12 @@ class CommercialService:
             total_cost=self._money(total_cost),
             unit_price=rounded_unit_price,
             total_price=self._money(rounded_unit_price * data.quantity),
+            costing_method=costing_method,
+            selected_sheet_width_mm=selected_width,
+            selected_sheet_length_mm=selected_length,
+            calculated_utilization_percent=self._money(calculated_utilization) if calculated_utilization is not None else None,
+            applied_gap_mm=applied_gap,
+            costing_warnings=warnings,
         )
 
     def _calculate_quote(self, data: QuoteCreate, number: str) -> Quote:

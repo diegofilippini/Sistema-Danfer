@@ -120,6 +120,12 @@ class QuoteItem(QuoteItemCreate):
     total_cost: float = 0
     unit_price: float = 0
     total_price: float = 0
+    costing_method: str = "aproveitamento_informado"
+    selected_sheet_width_mm: float | None = None
+    selected_sheet_length_mm: float | None = None
+    calculated_utilization_percent: float | None = None
+    applied_gap_mm: float = 0
+    costing_warnings: list[str] = Field(default_factory=list)
 
 
 class QuoteCreate(BaseModel):

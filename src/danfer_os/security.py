@@ -41,6 +41,13 @@ def security_middleware(auth: AuthService):
             user = auth.session(token or "")
         except AuthenticationError:
             return JSONResponse({"detail": "não autenticado"}, status_code=401)
+        if user.must_change_password and path not in {
+            "/api/v1/auth/me", "/api/v1/auth/change-password", "/api/v1/auth/logout"
+        }:
+            return JSONResponse(
+                {"detail": "troca de senha obrigatória antes de continuar"},
+                status_code=428,
+            )
         allowed = next(
             (roles for prefix, roles in ROLE_PREFIXES.items() if path.startswith(prefix)),
             None,
