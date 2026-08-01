@@ -1,4 +1,5 @@
 import base64
+from decimal import Decimal, ROUND_HALF_UP
 import io
 import math
 import re
@@ -6,7 +7,11 @@ import re
 import ezdxf
 from ezdxf import bbox
 
-from danfer_os.models.engineering import DxfAnalysis, DxfUpload, NestingSuggestion
+from danfer_os.models.engineering import (
+    DxfAnalysis, DxfQuoteDraftRequest, DxfUpload, NestingPart, NestingPlacement,
+    NestingPlan, NestingRequest, NestingSheet, NestingSuggestion, SheetEvaluation,
+)
+from danfer_os.models.commercial import QuoteItemCreate, QuoteProcess
 
 
 class DxfAnalysisError(ValueError):
@@ -107,3 +112,93 @@ class EngineeringService:
             nesting_suggestion=suggestion,
             warnings=sorted(set(warnings)),
         )
+
+    @staticmethod
+    def _arrange(parts: list[NestingPart], sheet: NestingSheet, gap: float, edge: float) -> tuple[list[NestingPlacement], list[str]]:
+        expanded: list[tuple[str, int, float, float, bool]] = []
+        for part in parts:
+            expanded.extend((part.code, index, part.width_mm, part.height_mm, part.allow_rotation) for index in range(1, part.quantity + 1))
+        expanded.sort(key=lambda item: (max(item[2], item[3]), item[2] * item[3]), reverse=True)
+        max_x, max_y = sheet.width_mm - edge, sheet.length_mm - edge
+        shelves: list[dict[str, float]] = []
+        placements: list[NestingPlacement] = []
+        unplaced: list[str] = []
+        for code, sequence, original_w, original_h, allow_rotation in expanded:
+            orientations = [(original_w, original_h, False)]
+            if allow_rotation and original_w != original_h:
+                orientations.append((original_h, original_w, True))
+            candidate = None
+            for shelf_index, shelf in enumerate(shelves):
+                for width, height, rotated in orientations:
+                    if height <= shelf["height"] and shelf["x"] + width <= max_x:
+                        score = (shelf["height"] - height, shelf["x"])
+                        if candidate is None or score < candidate[0]:
+                            candidate = (score, shelf_index, width, height, rotated)
+            if candidate is None:
+                next_y = edge if not shelves else shelves[-1]["y"] + shelves[-1]["height"] + gap
+                possible = [(w, h, r) for w, h, r in orientations if edge + w <= max_x and next_y + h <= max_y]
+                if possible:
+                    width, height, rotated = min(possible, key=lambda item: item[1])
+                    shelves.append({"x": edge, "y": next_y, "height": height})
+                    candidate = ((0, edge), len(shelves) - 1, width, height, rotated)
+            if candidate is None:
+                unplaced.append(f"{code} #{sequence}")
+                continue
+            _, shelf_index, width, height, rotated = candidate
+            shelf = shelves[shelf_index]
+            placements.append(NestingPlacement(
+                code=code, sequence=sequence, x_mm=round(shelf["x"], 3), y_mm=round(shelf["y"], 3),
+                width_mm=round(width, 3), height_mm=round(height, 3), rotated=rotated,
+            ))
+            shelf["x"] += width + gap
+        return placements, unplaced
+
+    @classmethod
+    def nesting(cls, data: NestingRequest) -> NestingPlan:
+        evaluations: list[tuple[NestingSheet, list[NestingPlacement], list[str], float]] = []
+        for sheet in data.sheets:
+            placements, unplaced = cls._arrange(data.parts, sheet, data.gap_mm, data.edge_margin_mm)
+            used = sum(item.width_mm * item.height_mm for item in placements)
+            utilization = used / (sheet.width_mm * sheet.length_mm) * 100
+            evaluations.append((sheet, placements, unplaced, utilization))
+        baseline = evaluations[0]
+        selected = baseline
+        reason = "chapa padrão selecionada"
+        for option in evaluations[1:]:
+            if len(option[2]) < len(selected[2]):
+                selected = option
+                reason = "alternativa acomoda mais peças"
+            elif len(option[2]) == len(selected[2]) and option[3] >= selected[3] + data.alternative_minimum_gain_percent:
+                selected = option
+                reason = f"ganho mínimo de {data.alternative_minimum_gain_percent:g}% atingido"
+        comparison = [SheetEvaluation(
+            sheet=sheet, placed_count=len(placements), unplaced_count=len(unplaced),
+            utilization_percent=round(utilization, 2), waste_percent=round(100 - utilization, 2),
+        ) for sheet, placements, unplaced, utilization in evaluations]
+        sheet, placements, unplaced, utilization = selected
+        return NestingPlan(
+            selected_sheet=sheet, placements=placements, unplaced=unplaced,
+            utilization_percent=round(utilization, 2), waste_percent=round(100 - utilization, 2),
+            comparison=comparison, selection_reason=reason,
+        )
+
+    @classmethod
+    def quote_drafts(cls, data: DxfQuoteDraftRequest) -> list[QuoteItemCreate]:
+        drafts = []
+        for upload in data.uploads:
+            analysis = cls.analyze(upload)
+            weight = analysis.net_area_mm2 * data.thickness_mm * data.density_kg_m3 / 1_000_000_000
+            minutes = analysis.cut_length_mm / data.cutting_speed_mm_min + analysis.piercings * data.piercing_seconds / 60
+            code = re.sub(r"[^A-Za-z0-9._-]+", "-", upload.filename.rsplit(".", 1)[0]).strip("-")[:60] or "DXF"
+            drafts.append(QuoteItemCreate(
+                code=code, description=analysis.description, quantity=analysis.suggested_quantity,
+                material=data.material, thickness_mm=data.thickness_mm,
+                width_mm=analysis.width_mm, length_mm=analysis.height_mm,
+                net_weight_kg=float(Decimal(str(weight)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)), material_price_kg=data.material_price_kg,
+                cut_length_mm=analysis.cut_length_mm, piercings=analysis.piercings,
+                nesting_mode=analysis.nesting_suggestion.value,
+                utilization_percent=max(round(analysis.fill_factor_percent, 2), 1),
+                processes=[QuoteProcess(name="Corte Laser", minutes=round(minutes, 3), hourly_rate=data.laser_hourly_rate)],
+                notes="; ".join(analysis.warnings),
+            ))
+        return drafts

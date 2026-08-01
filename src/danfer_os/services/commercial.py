@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal, ROUND_HALF_UP
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
@@ -38,6 +39,10 @@ class CommercialService:
         QuoteStatus.LOST: {QuoteStatus.DRAFT},
         QuoteStatus.CANCELLED: {QuoteStatus.DRAFT},
     }
+
+    @staticmethod
+    def _money(value: float) -> float:
+        return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
     def __init__(self, storage_path: Path | None = None) -> None:
         self._storage_path = storage_path
@@ -188,14 +193,15 @@ class CommercialService:
             if data.manual_unit_price is not None
             else calculated_price
         )
+        rounded_unit_price = self._money(unit_price)
         return QuoteItem(
             **data.model_dump(),
-            material_cost=round(material_cost, 2),
-            process_cost=round(process_cost, 2),
-            indirect_cost=round(indirect, 2),
-            total_cost=round(total_cost, 2),
-            unit_price=round(unit_price, 2),
-            total_price=round(unit_price * data.quantity, 2),
+            material_cost=self._money(material_cost),
+            process_cost=self._money(process_cost),
+            indirect_cost=self._money(indirect),
+            total_cost=self._money(total_cost),
+            unit_price=rounded_unit_price,
+            total_price=self._money(rounded_unit_price * data.quantity),
         )
 
     def _calculate_quote(self, data: QuoteCreate, number: str) -> Quote:
@@ -222,11 +228,11 @@ class CommercialService:
             **data.model_dump(exclude={"items"}),
             items=items,
             number=number,
-            subtotal=round(subtotal, 2),
-            taxes=round(taxes, 2),
-            total=round(total, 2),
-            total_cost=round(total_cost, 2),
-            gross_profit=round(total - taxes - total_cost, 2),
+            subtotal=self._money(subtotal),
+            taxes=self._money(taxes),
+            total=self._money(total),
+            total_cost=self._money(total_cost),
+            gross_profit=self._money(total - taxes - total_cost),
         )
 
     def create_quote(self, data: QuoteCreate) -> Quote:

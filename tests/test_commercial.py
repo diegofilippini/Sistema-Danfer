@@ -67,6 +67,7 @@ def test_quote_calculation_revision_status_and_pdf(tmp_path: Path) -> None:
     assert quote["number"].startswith("ORC-")
     assert quote["items"][0]["material_cost"] == 62.5
     assert quote["items"][0]["process_cost"] == 57.5
+    assert quote["items"][0]["total_price"] == quote["items"][0]["unit_price"] * 2
     expected_ipi = round(quote["subtotal"] * 0.05, 2)
     assert quote["taxes"] == expected_ipi
     assert quote["total"] > quote["subtotal"]

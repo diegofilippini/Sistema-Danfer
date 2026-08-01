@@ -1,4 +1,4 @@
-# Danfer Industrial OS 1.0.0 — Guia operacional
+# Danfer Industrial OS 1.1.0 — Guia operacional
 
 ## Inicialização e acesso
 
@@ -10,13 +10,14 @@ troque a senha após o primeiro acesso.
 
 1. Cadastre clientes em **CRM / Clientes**.
 2. Mantenha materiais, preços, espessuras e operações em **Engenharia / DXF**.
-3. Importe o DXF; a análise cria um registro pesquisável na Biblioteca Técnica.
-4. Monte a estrutura BOM e crie/libere a ordem de produção.
-5. Consulte carga e capacidade no **PCP diário**, ajustando exceções do calendário pela API quando necessário.
-6. Registre apontamentos de operação, material, terceiro e qualidade na OP.
-7. Acompanhe a comparação de custo estimado versus realizado.
-8. Use a Central de Solicitações para demandas entre Comercial, PCP e Engenharia.
-9. Prepare mensagens; o sistema gera o link de WhatsApp/e-mail, mas não envia sem ação do usuário.
+3. Importe um lote DXF; a análise cria registros na Biblioteca Técnica e itens prontos para o orçamento.
+4. Use **Planejar nesting** para comparar chapas, rotações, ocupação e itens não encaixados.
+5. Monte a estrutura BOM e crie/libere a ordem de produção.
+6. Consulte carga e capacidade no **PCP diário**, ajustando exceções do calendário pela API quando necessário.
+7. Registre apontamentos de operação, material, terceiro e qualidade na OP.
+8. Acompanhe a comparação de custo estimado versus realizado.
+9. Use a Central de Solicitações para demandas entre Comercial, PCP e Engenharia.
+10. Prepare mensagens; o sistema gera o link de WhatsApp/e-mail, mas não envia sem ação do usuário.
 
 ## Orçamentos e propostas
 

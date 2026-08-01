@@ -6,7 +6,7 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.0.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.1.0`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
@@ -17,7 +17,7 @@ controle de acesso por perfil e API integrada.
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
 
-## Versão 1.0.0 — Consolidação por fases
+## Versão 1.1.0 — Consolidação por fases
 
 - CRM e cadastro de clientes;
 - orçamento de venda e serviço;
@@ -36,6 +36,10 @@ calandra por tempo/peso, catálogo de materiais e operações ERP, registro de D
 Biblioteca Técnica, PCP diário com capacidade/calendário, custos estimados versus
 realizados, faturamento Danfer/DF, Central de Solicitações e preparação de mensagens
 para WhatsApp/e-mail.
+
+A versão 1.1 acrescenta importação DXF em lote para o orçamento e planejador
+visual de nesting com rotação, verificação de encaixe e comparação entre chapas
+1200 × 3000 e 1500 × 3000.
 
 API central dos módulos industriais da Danfer.
 

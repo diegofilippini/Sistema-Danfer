@@ -1,10 +1,10 @@
-# Matriz de consolidação 1.0.0
+# Matriz de consolidação 1.1.0
 
 | Área | Evidência no sistema | Situação |
 |---|---|---|
 | Comercial e proposta | editor multi-itens, revisões, PDF A4, Danfer/DF | Consolidado |
 | Custos | venda/serviço, margem, lote de dobra, calandra tempo/peso | Consolidado |
-| Engenharia | materiais/ERP, Biblioteca Técnica, análise e registro DXF | Consolidado |
+| Engenharia | materiais/ERP, Biblioteca, lote DXF, itens de orçamento e nesting visual | Consolidado |
 | PCP | OP persistente, capacidade diária, calendário e apontamentos | Consolidado |
 | Custos reais | material, processo, terceiro, qualidade e desvio percentual | Consolidado |
 | ERP | pedidos, códigos, empresa, payload, tentativas e erro persistente | Adaptador local consolidado |
@@ -19,4 +19,4 @@
 - Push móvel requer hospedagem HTTPS e credenciais FCM/Web Push.
 - Os CNPJs e endereços fiscais de Danfer/DF devem ser preenchidos nos perfis de faturamento.
 - O logotipo vetorial e o banner fotográfico oficiais não foram fornecidos; o sistema usa a identidade geométrica reconstruída.
-- Nesting CNC automático e geração de programa de máquina dependem do pós-processador/equipamento utilizado.
+- O nesting geométrico e a prévia SVG estão disponíveis; geração de programa CNC depende do pós-processador/equipamento.

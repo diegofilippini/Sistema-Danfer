@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DxfUpload(BaseModel):
@@ -34,3 +34,73 @@ class DxfRegistration(DxfUpload):
     material: str = Field(default="", max_length=100)
     thickness_mm: float | None = Field(default=None, gt=0)
     revision: str = Field(default="A", min_length=1, max_length=20)
+
+
+class NestingPart(BaseModel):
+    code: str = Field(min_length=1, max_length=60)
+    width_mm: float = Field(gt=0)
+    height_mm: float = Field(gt=0)
+    quantity: int = Field(default=1, gt=0, le=500)
+    allow_rotation: bool = True
+
+
+class NestingSheet(BaseModel):
+    name: str = Field(min_length=2, max_length=60)
+    width_mm: float = Field(gt=0)
+    length_mm: float = Field(gt=0)
+
+
+class NestingRequest(BaseModel):
+    parts: list[NestingPart] = Field(min_length=1, max_length=200)
+    sheets: list[NestingSheet] = Field(default_factory=lambda: [
+        NestingSheet(name="Padrão 1200 × 3000", width_mm=1200, length_mm=3000),
+        NestingSheet(name="Alternativa 1500 × 3000", width_mm=1500, length_mm=3000),
+    ], min_length=1, max_length=10)
+    gap_mm: float = Field(default=5, ge=0, le=100)
+    edge_margin_mm: float = Field(default=10, ge=0, le=200)
+    alternative_minimum_gain_percent: float = Field(default=8, ge=0, le=100)
+
+    @model_validator(mode="after")
+    def limit_expanded_parts(self) -> "NestingRequest":
+        if sum(item.quantity for item in self.parts) > 1000:
+            raise ValueError("máximo de 1000 peças por plano")
+        return self
+
+
+class NestingPlacement(BaseModel):
+    code: str
+    sequence: int
+    x_mm: float
+    y_mm: float
+    width_mm: float
+    height_mm: float
+    rotated: bool
+
+
+class SheetEvaluation(BaseModel):
+    sheet: NestingSheet
+    placed_count: int
+    unplaced_count: int
+    utilization_percent: float
+    waste_percent: float
+
+
+class NestingPlan(BaseModel):
+    selected_sheet: NestingSheet
+    placements: list[NestingPlacement]
+    unplaced: list[str]
+    utilization_percent: float
+    waste_percent: float
+    comparison: list[SheetEvaluation]
+    selection_reason: str
+
+
+class DxfQuoteDraftRequest(BaseModel):
+    uploads: list[DxfUpload] = Field(min_length=1, max_length=200)
+    material: str = Field(default="", max_length=100)
+    thickness_mm: float = Field(gt=0)
+    material_price_kg: float = Field(default=0, ge=0)
+    density_kg_m3: float = Field(default=7850, gt=0)
+    cutting_speed_mm_min: float = Field(default=2000, gt=0)
+    piercing_seconds: float = Field(default=1, ge=0)
+    laser_hourly_rate: float = Field(default=180, ge=0)

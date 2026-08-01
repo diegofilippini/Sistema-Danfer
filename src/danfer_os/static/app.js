@@ -8,6 +8,8 @@ const money = value => Number(value || 0).toLocaleString("pt-BR", {
   style: "currency", currency: "BRL"
 });
 let pendingQuoteItems = [];
+let lastDxfDrafts = [];
+let quoteMaterialCatalog = [];
 
 async function req(path, options = {}) {
   const response = await fetch(api + path, {
@@ -221,6 +223,7 @@ dialogControls("#new-quality", "#quality-dialog", ".close-quality");
 dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
 dialogControls("#new-material", "#material-dialog", ".close-material");
 dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
+dialogControls("#new-nesting", "#nesting-dialog", ".close-nesting");
 dialogControls("#new-work-log", "#work-log-dialog", ".close-work-log");
 dialogControls("#new-request", "#request-dialog", ".close-request");
 dialogControls("#new-message", "#message-dialog", ".close-message");
@@ -259,20 +262,57 @@ $("#material-form").onsubmit = async event => {
 $("#dxf-form").onsubmit = async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.target));
-  const file = event.target.elements.dxf_file.files[0];
-  const content_base64 = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-  const payload = {...values, filename:file.name, content_base64};
-  delete payload.dxf_file;
-  if (payload.thickness_mm) payload.thickness_mm = Number(payload.thickness_mm); else delete payload.thickness_mm;
   try {
-    await req("/engineering/dxf/register", {method:"POST", body:JSON.stringify(payload)});
+    const files = [...event.target.elements.dxf_file.files];
+    const uploads = await Promise.all(files.map(file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({filename:file.name, content_base64:String(reader.result).split(",")[1]});
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    })));
+    const thickness = Number(values.thickness_mm);
+    lastDxfDrafts = await req("/engineering/dxf/quote-drafts", {method:"POST", body:JSON.stringify({
+      uploads, material:values.material, thickness_mm:thickness,
+      material_price_kg:Number(values.material_price_kg || 0)
+    })});
+    await Promise.all(uploads.map((upload, index) => req("/engineering/dxf/register", {method:"POST", body:JSON.stringify({
+      ...upload, danfer_code:`${values.danfer_code}-${String(index + 1).padStart(3, "0")}`,
+      customer_code:values.customer_code, customer:values.customer, material:values.material,
+      thickness_mm:thickness, revision:values.revision
+    })})));
     $("#dxf-dialog").close(); event.target.reset(); await engineering();
-    alert("DXF analisado e cadastrado na Biblioteca Técnica.");
+    renderDxfDrafts();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
+};
+
+function renderDxfDrafts() {
+  $("#dxf-drafts").innerHTML = lastDxfDrafts.length ? table(
+    ["Código","Descrição","Qtd.","Peso","Corte","Ação"],
+    lastDxfDrafts.map((item, index) => `<tr><td><b>${esc(item.code)}</b></td><td>${esc(item.description)}</td><td>${item.quantity}</td><td>${item.net_weight_kg} kg</td><td>${item.cut_length_mm} mm</td><td>${index === 0 ? '<button class="action" id="use-dxf-drafts">Usar lote no orçamento</button>' : ''}</td></tr>`)
+  ) : '<div class="empty">Importe arquivos DXF para preparar itens de orçamento.</div>';
+  if ($("#use-dxf-drafts")) $("#use-dxf-drafts").onclick = () => {
+    $("#new-quote").click();
+    pendingQuoteItems = lastDxfDrafts.map(item => ({...item, margin_percent:30}));
+    renderPendingQuoteItems();
+  };
+}
+
+$("#nesting-form").onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  try {
+    const parts = values.parts.split(/\r?\n/).filter(Boolean).map((line, index) => {
+      const [code, width, height, quantity = "1"] = line.split(";").map(value => value.trim());
+      if (!code || !Number(width) || !Number(height) || !Number(quantity)) throw Error(`Linha ${index + 1} inválida.`);
+      return {code, width_mm:Number(width), height_mm:Number(height), quantity:Number(quantity), allow_rotation:true};
+    });
+    const payload = {parts, gap_mm:Number(values.gap_mm), edge_margin_mm:Number(values.edge_margin_mm), alternative_minimum_gain_percent:Number(values.alternative_minimum_gain_percent)};
+    const plan = await req("/engineering/nesting/plan", {method:"POST", body:JSON.stringify(payload)});
+    const previewResponse = await fetch(api + "/engineering/nesting/preview.svg", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
+    if (!previewResponse.ok) throw Error("Não foi possível gerar a prévia do nesting.");
+    const previewUrl = URL.createObjectURL(await previewResponse.blob());
+    $("#nesting-result").innerHTML = `<div class="nesting-summary"><b>${esc(plan.selected_sheet.name)}</b><span>Ocupação ${plan.utilization_percent}% · Perda ${plan.waste_percent}% · ${esc(plan.selection_reason)}</span></div><img class="nesting-preview" src="${previewUrl}" alt="Prévia do nesting"><div class="comparison">${plan.comparison.map(item => `<span>${esc(item.sheet.name)}: ${item.placed_count} posicionadas, ${item.unplaced_count} pendentes, ${item.utilization_percent}%</span>`).join("")}</div>`;
+    $("#nesting-dialog").close();
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
@@ -288,12 +328,21 @@ $("#client-form").onsubmit = async event => {
 $("#new-quote").addEventListener("click", async () => {
   pendingQuoteItems = [];
   renderPendingQuoteItems();
-  const clients = await req("/commercial/clients");
+  const [clients, materials] = await Promise.all([req("/commercial/clients"), req("/catalogs/materials?active=true")]);
+  quoteMaterialCatalog = materials;
+  $("#quote-material-options").innerHTML = materials.map(item => `<option value="${esc(item.description)}">${esc(item.erp_code)} · ${item.thickness_mm} mm · ${money(item.price_per_kg)}</option>`).join("");
   $("#quote-client").innerHTML = clients.map(client =>
     `<option value="${client.id}">${esc(client.name)}</option>`
   ).join("");
   const validity = new Date(); validity.setDate(validity.getDate() + 10);
   $("#quote-form [name=valid_until]").value = validity.toISOString().slice(0,10);
+});
+
+$("#quote-form [name=item_material]").addEventListener("change", event => {
+  const selected = quoteMaterialCatalog.find(item => item.description.toLocaleLowerCase("pt-BR") === event.target.value.toLocaleLowerCase("pt-BR"));
+  if (!selected) return;
+  $("#quote-form [name=item_thickness]").value = selected.thickness_mm;
+  $("#quote-form [name=item_material_price]").value = selected.price_per_kg;
 });
 
 function quoteItemFromForm(form) {
@@ -317,6 +366,7 @@ async function engineering() {
   const [materials, operations] = await Promise.all([req("/catalogs/materials"), req("/catalogs/operations")]);
   $("#material-catalog").innerHTML = table(["ERP","Material","Esp.","Preço/kg","Status"], materials.map(item => `<tr><td><b>${esc(item.erp_code)}</b></td><td>${esc(item.description)}<br><small>${esc(item.specification)}</small></td><td>${item.thickness_mm} mm</td><td>${money(item.price_per_kg)}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`));
   $("#operation-catalog").innerHTML = table(["Código","Operação","Custeio","Valor hora"], operations.map(item => `<tr><td><b>${item.erp_code}</b></td><td>${esc(item.name)}</td><td>${esc(item.pricing_mode)}</td><td>${money(item.hourly_rate)}</td></tr>`));
+  renderDxfDrafts();
 }
 
 function renderPendingQuoteItems() {
