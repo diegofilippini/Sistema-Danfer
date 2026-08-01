@@ -31,6 +31,20 @@ def test_billing_requests_and_whatsapp_draft_are_persistent(tmp_path: Path) -> N
     assert moved.json()["comments"][0]["message"] == "Análise iniciada"
     assert moved.json()["promised_date"] == "2026-08-15"
 
+    engineering_notifications = client.get(
+        "/api/v1/notifications", params={"username": "Engenharia", "role": "engenharia"}
+    ).json()
+    assert any(item["title"].startswith("Nova solicitação") for item in engineering_notifications)
+    assert any(item["title"].startswith("Solicitação atribuída") for item in engineering_notifications)
+    requester_notifications = client.get(
+        "/api/v1/notifications", params={"username": "Comercial", "role": "comercial"}
+    ).json()
+    progress = next(item for item in requester_notifications if item["title"].startswith("Andamento"))
+    assert "Análise iniciada" in progress["message"]
+    marked = client.post(f"/api/v1/notifications/{progress['id']}/read")
+    assert marked.status_code == 200
+    assert marked.json()["read"] is True
+
     message = client.post("/api/v1/communications/messages", json={
         "company_unit": "df", "channel": "whatsapp", "recipient": "+55 (11) 99999-1234",
         "body": "Sua solicitação está em atendimento.", "linked_entity": "solicitacao",
@@ -43,6 +57,10 @@ def test_billing_requests_and_whatsapp_draft_are_persistent(tmp_path: Path) -> N
     restarted = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
     assert restarted.get("/api/v1/requests").json()[0]["assigned_to"] == "Engenharia"
     assert restarted.get("/api/v1/communications/messages").json()[0]["status"] == "pronta"
+    restored_notifications = restarted.get(
+        "/api/v1/notifications", params={"username": "Comercial", "role": "comercial"}
+    ).json()
+    assert next(item for item in restored_notifications if item["id"] == progress["id"])["read"] is True
 
 
 def test_erp_event_carries_company_codes_failure_and_survives_restart(tmp_path: Path) -> None:

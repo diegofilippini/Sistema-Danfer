@@ -49,6 +49,24 @@ def test_nesting_compares_sheets_places_without_overlap_and_renders_svg() -> Non
     assert "Ocupação" in svg.text
 
 
+def test_batch_nesting_uses_multiple_sheets_and_reports_real_utilization() -> None:
+    client = TestClient(create_app(TechnicalLibrary()))
+    response = client.post("/api/v1/engineering/nesting/batch-plan", json={
+        "parts": [
+            {"code": "A", "width_mm": 700, "height_mm": 700, "quantity": 10},
+            {"code": "B", "width_mm": 300, "height_mm": 400, "quantity": 12},
+        ],
+        "sheets": [{"name": "Chapa teste", "width_mm": 1500, "length_mm": 3000}],
+        "gap_mm": 5, "edge_margin_mm": 10, "alternative_minimum_gain_percent": 8,
+    })
+    assert response.status_code == 200
+    plan = response.json()
+    assert plan["sheet_count"] > 1
+    assert plan["placed_count"] == 22
+    assert plan["unplaced"] == []
+    assert 0 < plan["utilization_percent"] <= 100
+
+
 def test_dxf_batch_becomes_priced_quote_item_drafts() -> None:
     client = TestClient(create_app(TechnicalLibrary()))
     response = client.post("/api/v1/engineering/dxf/quote-drafts", json={

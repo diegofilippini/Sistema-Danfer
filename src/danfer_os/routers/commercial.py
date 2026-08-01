@@ -1,7 +1,7 @@
 from io import BytesIO
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 
 from danfer_os.models.commercial import (
@@ -9,6 +9,8 @@ from danfer_os.models.commercial import (
     ClientCreate,
     ClientUpdate,
     CostSettings,
+    CustomerProposalCreate,
+    CustomerProposalDecision,
     Quote,
     QuoteCreate,
     QuoteRevision,
@@ -60,6 +62,10 @@ def create_router(service: CommercialService) -> APIRouter:
     def update_cost_settings(data: CostSettings) -> CostSettings:
         return service.update_settings(data)
 
+    @router.get("/quote-bend-times", response_model=dict[str, float])
+    def quote_bend_times() -> dict[str, float]:
+        return service.bend_time_settings()
+
     @router.post("/quotes", response_model=Quote, status_code=status.HTTP_201_CREATED)
     def create_quote(data: QuoteCreate) -> Quote:
         try:
@@ -106,6 +112,33 @@ def create_router(service: CommercialService) -> APIRouter:
         except CommercialNotFoundError as error:
             raise HTTPException(status_code=404, detail="orçamento não encontrado") from error
 
+    @router.post("/quotes/{quote_id}/customer-proposals", response_model=Quote, status_code=201)
+    def submit_customer_proposal(quote_id: UUID, data: CustomerProposalCreate, request: Request) -> Quote:
+        user = getattr(request.state, "user", None)
+        if user and not data.submitted_by:
+            data = data.model_copy(update={"submitted_by": user.name})
+        try:
+            return service.submit_customer_proposal(quote_id, data)
+        except CommercialNotFoundError as error:
+            raise HTTPException(status_code=404, detail="orçamento não encontrado") from error
+        except CommercialValidationError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @router.post("/quotes/{quote_id}/customer-proposals/{proposal_id}/decision", response_model=Quote)
+    def decide_customer_proposal(
+        quote_id: UUID, proposal_id: UUID, data: CustomerProposalDecision, request: Request
+    ) -> Quote:
+        user = getattr(request.state, "user", None)
+        is_admin = user is None or user.role.value == "administrador"
+        if user and not data.decided_by:
+            data = data.model_copy(update={"decided_by": user.name})
+        try:
+            return service.decide_customer_proposal(quote_id, proposal_id, data, is_admin)
+        except CommercialNotFoundError as error:
+            raise HTTPException(status_code=404, detail="orçamento ou proposta não encontrada") from error
+        except CommercialValidationError as error:
+            raise HTTPException(status_code=403 if "administrador" in str(error) else 409, detail=str(error)) from error
+
     @router.get("/quotes/{quote_id}/proposal.pdf")
     def proposal_pdf(quote_id: UUID) -> StreamingResponse:
         try:
@@ -113,7 +146,7 @@ def create_router(service: CommercialService) -> APIRouter:
             client = service.get_client(quote.client_id)
         except CommercialNotFoundError as error:
             raise HTTPException(status_code=404, detail="orçamento não encontrado") from error
-        buffer = BytesIO(build_proposal_pdf(quote, client))
+        buffer = BytesIO(build_proposal_pdf(quote, client, service.settings()))
         return StreamingResponse(
             buffer,
             media_type="application/pdf",

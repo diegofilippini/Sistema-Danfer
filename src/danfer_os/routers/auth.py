@@ -1,6 +1,8 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
-from danfer_os.models.auth import LoginRequest, LoginResult, PasswordChange, User, UserCreate
+from danfer_os.models.auth import LoginRequest, LoginResult, PasswordChange, User, UserAccessUpdate, UserCreate
 from danfer_os.services.auth import AuthenticationError, AuthService
 
 
@@ -51,6 +53,13 @@ def create_router(service: AuthService) -> APIRouter:
     @router.get("/users", response_model=list[User])
     def users() -> list[User]:
         return service.list_users()
+
+    @router.patch("/users/{user_id}", response_model=User)
+    def update_user_access(user_id: UUID, data: UserAccessUpdate) -> User:
+        try:
+            return service.update_access(user_id, data)
+        except AuthenticationError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     @router.post("/change-password", response_model=User)
     def change_password(

@@ -1,4 +1,4 @@
-# Danfer Industrial OS 1.4.0 — Guia operacional
+# Danfer Industrial OS 1.5.0 — Guia operacional
 
 ## Inicialização e acesso
 

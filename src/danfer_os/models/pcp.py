@@ -121,3 +121,39 @@ class DailyCapacity(BaseModel):
     utilization_percent: float
     overloaded: bool
     orders: list[str] = Field(default_factory=list)
+
+
+class DirectRequestStatus(StrEnum):
+    OPEN = "aberta"
+    SCHEDULED = "programada"
+    IN_PROGRESS = "em_producao"
+    COMPLETED = "concluida"
+    CANCELLED = "cancelada"
+
+
+class DirectProductionRequestCreate(BaseModel):
+    origin: str = Field(default="pedido_direto", max_length=50)
+    client: str = Field(min_length=2, max_length=160)
+    contact: str = Field(default="", max_length=120)
+    description: str = Field(min_length=3, max_length=1000)
+    processes: list[str] = Field(min_length=1)
+    material: str = Field(default="", max_length=120)
+    due_date: date
+    priority: int = Field(default=3, ge=1, le=5)
+    billing_unit: str = Field(default="danfer", max_length=30)
+    reason: str = Field(default="", max_length=300)
+
+
+class DirectProductionRequest(DirectProductionRequestCreate):
+    id: UUID = Field(default_factory=uuid4)
+    number: str
+    status: DirectRequestStatus = DirectRequestStatus.OPEN
+    progress_percent: float = Field(default=0, ge=0, le=100)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class DirectProductionRequestUpdate(BaseModel):
+    status: DirectRequestStatus | None = None
+    progress_percent: float | None = Field(default=None, ge=0, le=100)
+    due_date: date | None = None
+    priority: int | None = Field(default=None, ge=1, le=5)

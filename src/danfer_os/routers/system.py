@@ -13,7 +13,7 @@ def create_router(data_dir: Path) -> APIRouter:
 
     @router.get("/version")
     def version() -> dict[str, str]:
-        return {"version": "1.4.0", "data_schema": "2"}
+        return {"version": "1.5.0", "data_schema": "2"}
 
     @router.get("/backup")
     def backup() -> StreamingResponse:
@@ -23,7 +23,7 @@ def create_router(data_dir: Path) -> APIRouter:
                 for path in data_dir.rglob("*"):
                     if path.is_file():
                         archive.write(path, path.relative_to(data_dir))
-            archive.writestr("MANIFEST.txt", "Danfer Industrial OS 1.4.0\nSchema: 2\n")
+            archive.writestr("MANIFEST.txt", "Danfer Industrial OS 1.5.0\nSchema: 2\n")
         buffer.seek(0)
         return StreamingResponse(buffer, media_type="application/zip", headers={"Content-Disposition": "attachment; filename=danfer-backup.zip"})
 

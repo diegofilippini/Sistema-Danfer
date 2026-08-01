@@ -6,11 +6,18 @@ import secrets
 from pathlib import Path
 from uuid import UUID
 
-from danfer_os.models.auth import LoginResult, User, UserCreate, UserRole
+from danfer_os.models.auth import LoginResult, User, UserAccessUpdate, UserCreate, UserRole
 
 
 class AuthenticationError(ValueError):
     pass
+
+
+VALID_PERMISSIONS = {
+    "dashboard", "crm", "quotes", "library", "engineering", "bom", "pcp",
+    "integrations", "coordination", "quality", "maintenance", "users", "audit",
+    "system", "quality-dashboard", "deviations", "management-dashboard", "monthly-analysis",
+}
 
 
 class AuthService:
@@ -70,6 +77,7 @@ class AuthService:
             username=data.username.lower(),
             name=data.name,
             role=data.role,
+            permissions=self._validate_permissions(data.permissions),
         )
         self._users[user.id] = (user, self._hash(data.password))
         self._save()
@@ -77,6 +85,29 @@ class AuthService:
 
     def list_users(self) -> list[User]:
         return [user.model_copy(deep=True) for user, _ in self._users.values()]
+
+    @staticmethod
+    def _validate_permissions(permissions: list[str] | None) -> list[str] | None:
+        if permissions is None:
+            return None
+        normalized = list(dict.fromkeys(permissions))
+        invalid = set(normalized) - VALID_PERMISSIONS
+        if invalid:
+            raise AuthenticationError(f"permissões inválidas: {', '.join(sorted(invalid))}")
+        return normalized
+
+    def update_access(self, user_id: UUID, data: UserAccessUpdate) -> User:
+        current = self._users.get(user_id)
+        if current is None:
+            raise AuthenticationError("usuário não encontrado")
+        user, password_hash = current
+        changes = data.model_dump(exclude_unset=True)
+        if "permissions" in changes:
+            changes["permissions"] = self._validate_permissions(changes["permissions"])
+        updated = user.model_copy(update=changes)
+        self._users[user_id] = (updated, password_hash)
+        self._save()
+        return updated.model_copy(deep=True)
 
     def login(self, username: str, password: str) -> LoginResult:
         found = next(

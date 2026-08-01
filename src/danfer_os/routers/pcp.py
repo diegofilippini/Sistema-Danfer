@@ -15,6 +15,9 @@ from danfer_os.models.pcp import (
     WorkCenter,
     WorkLog,
     WorkLogCreate,
+    DirectProductionRequest,
+    DirectProductionRequestCreate,
+    DirectProductionRequestUpdate,
 )
 from danfer_os.services.pcp import (
     PcpService,
@@ -74,6 +77,21 @@ def create_router(service: PcpService) -> APIRouter:
             return service.daily_capacity(start, days)
         except PcpValidationError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.post("/direct-requests", response_model=DirectProductionRequest, status_code=201)
+    def create_direct_request(data: DirectProductionRequestCreate) -> DirectProductionRequest:
+        return service.create_direct_request(data)
+
+    @router.get("/direct-requests", response_model=list[DirectProductionRequest])
+    def direct_requests() -> list[DirectProductionRequest]:
+        return service.direct_requests()
+
+    @router.patch("/direct-requests/{request_id}", response_model=DirectProductionRequest)
+    def update_direct_request(request_id: UUID, data: DirectProductionRequestUpdate) -> DirectProductionRequest:
+        try:
+            return service.update_direct_request(request_id, data)
+        except ProductionOrderNotFoundError as error:
+            raise HTTPException(status_code=404, detail="solicitação não encontrada") from error
 
     @router.get("/orders/{order_id}", response_model=ProductionOrder)
     def get(order_id: UUID) -> ProductionOrder:

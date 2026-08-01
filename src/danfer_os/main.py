@@ -32,6 +32,12 @@ from danfer_os.routers.catalogs import create_router as create_catalogs_router
 from danfer_os.services.catalogs import CatalogService
 from danfer_os.routers.coordination import create_router as create_coordination_router
 from danfer_os.services.coordination import CoordinationService
+from danfer_os.routers.analytics import create_router as create_analytics_router
+from danfer_os.routers.crm import create_router as create_crm_router
+from danfer_os.services.crm import CrmService
+from danfer_os.routers.search import create_router as create_search_router
+from danfer_os.routers.push import create_router as create_push_router
+from danfer_os.services.push import PushService
 
 
 def create_app(
@@ -43,7 +49,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="1.4.0",
+        version="1.5.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -64,9 +70,10 @@ def create_app(
     integration_service = IntegrationService(
         library, None if isolated_test_mode else data_dir / "integrations.json"
     )
-    operations_service = OperationsService(data_dir / "operations.json")
+    push_service = PushService(data_dir / "push-subscriptions.json")
+    operations_service = OperationsService(data_dir / "operations.json", push_service)
     catalog_service = CatalogService(data_dir / "catalogs.json")
-    commercial_service = CommercialService(data_dir / "commercial.json", catalog_service)
+    commercial_service = CommercialService(data_dir / "commercial.json", catalog_service, operations_service)
     if os.getenv("DANFER_SEED_DEMO") == "1":
         seed_demo(
             library,
@@ -103,6 +110,10 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
+        create_analytics_router(commercial_service, pcp_service, operations_service),
+        prefix="/api/v1",
+    )
+    app.include_router(
         create_auth_router(auth_service),
         prefix="/api/v1",
     )
@@ -122,12 +133,14 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")
-    app.include_router(
-        create_coordination_router(CoordinationService(
-            None if isolated_test_mode else data_dir / "coordination.json"
-        )),
-        prefix="/api/v1",
+    coordination_service = CoordinationService(
+        None if isolated_test_mode else data_dir / "coordination.json",
+        operations_service,
     )
+    app.include_router(create_coordination_router(coordination_service), prefix="/api/v1")
+    app.include_router(create_crm_router(CrmService(None if isolated_test_mode else data_dir / "crm.json")), prefix="/api/v1")
+    app.include_router(create_search_router(commercial_service, pcp_service, coordination_service), prefix="/api/v1")
+    app.include_router(create_push_router(push_service), prefix="/api/v1")
     static_dir = Path(__file__).with_name("static")
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
     return app

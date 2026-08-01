@@ -15,6 +15,7 @@ from danfer_os.models.operations import (
     QualityOccurrence,
     QualityOccurrenceCreate,
 )
+from danfer_os.services.push import PushService
 
 
 class OperationsNotFoundError(LookupError):
@@ -22,8 +23,9 @@ class OperationsNotFoundError(LookupError):
 
 
 class OperationsService:
-    def __init__(self, storage_path: Path | None = None) -> None:
+    def __init__(self, storage_path: Path | None = None, push: PushService | None = None) -> None:
         self._storage_path = storage_path
+        self._push = push
         self._quality: dict[UUID, QualityOccurrence] = {}
         self._maintenance: dict[UUID, MaintenanceOrder] = {}
         self._audits: list[AuditEvent] = []
@@ -129,6 +131,8 @@ class OperationsService:
         item = Notification(**data.model_dump())
         self._notifications[item.id] = item
         self.audit("notificacoes", "criar", str(item.id), item.title)
+        if self._push:
+            self._push.send(item.title, item.message, item.recipient_username, item.recipient_role)
         return item.model_copy(deep=True)
 
     def notifications(self, username: str = "", role: str = "") -> list[Notification]:

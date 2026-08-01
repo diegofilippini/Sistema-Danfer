@@ -64,6 +64,7 @@ class QuoteStatus(StrEnum):
     DRAFT = "em_elaboracao"
     SENT = "enviado"
     NEGOTIATION = "em_negociacao"
+    PENDING_ADMIN_APPROVAL = "aguardando_aprovacao_administrativa"
     APPROVED = "aprovado"
     LOST = "perdido"
     CANCELLED = "cancelado"
@@ -91,6 +92,15 @@ class QuoteProcess(BaseModel):
     fixed_cost: float = Field(default=0, ge=0)
 
 
+class AppliedNestingPlan(BaseModel):
+    reference: str = Field(default="", max_length=100)
+    sheet_width_mm: float = Field(gt=0)
+    sheet_length_mm: float = Field(gt=0)
+    sheet_count: int = Field(gt=0)
+    utilization_percent: float = Field(gt=0, le=100)
+    waste_percent: float = Field(ge=0, lt=100)
+
+
 class QuoteItemCreate(BaseModel):
     code: str = Field(min_length=1, max_length=60)
     description: str = Field(min_length=2, max_length=200)
@@ -104,8 +114,15 @@ class QuoteItemCreate(BaseModel):
     material_price_kg: float | None = Field(default=None, ge=0)
     cut_length_mm: float = Field(default=0, ge=0)
     piercings: int = Field(default=0, ge=0)
+    laser_estimated_minutes: float = Field(default=0, ge=0)
+    laser_additional_minutes: float = Field(default=0, ge=0)
+    laser_additional_reason: str = Field(default="", max_length=500)
+    bend_estimated_minutes: float = Field(default=0, ge=0)
+    bend_additional_minutes: float = Field(default=0, ge=0)
+    bend_additional_reason: str = Field(default="", max_length=500)
     nesting_mode: NestingMode = NestingMode.AUTOMATIC
     utilization_percent: float | None = Field(default=None, gt=0, le=100)
+    nesting_plan: AppliedNestingPlan | None = None
     processes: list[QuoteProcess] = Field(default_factory=list)
     manual_unit_price: float | None = Field(default=None, ge=0)
     margin_percent: float | None = Field(default=None, ge=0, lt=100)
@@ -125,6 +142,10 @@ class QuoteItem(QuoteItemCreate):
     selected_sheet_length_mm: float | None = None
     calculated_utilization_percent: float | None = None
     applied_gap_mm: float = 0
+    selected_sheet_count: int | None = None
+    calculated_waste_percent: float | None = None
+    nesting_calculation_source: str = "administrativo"
+    nesting_plan_reference: str = ""
     costing_warnings: list[str] = Field(default_factory=list)
 
 
@@ -186,6 +207,8 @@ class Quote(QuoteCreate):
     total: float = 0
     total_cost: float = 0
     gross_profit: float = 0
+    effective_margin_percent: float = 0
+    customer_proposals: list["CustomerProposal"] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -203,14 +226,59 @@ class StatusChange(BaseModel):
     reason: str = Field(default="", max_length=500)
 
 
+class CustomerProposalStatus(StrEnum):
+    PENDING = "pendente"
+    APPROVED = "aprovada"
+    REJECTED = "recusada"
+
+
+class CustomerProposalCreate(BaseModel):
+    proposed_total: float = Field(gt=0)
+    submitted_by: str = Field(default="", max_length=120)
+    notes: str = Field(default="", max_length=1000)
+
+
+class CustomerProposalDecision(BaseModel):
+    approved: bool
+    decided_by: str = Field(default="", max_length=120)
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class CustomerProposal(BaseModel):
+    id: UUID = Field(default_factory=uuid4)
+    quoted_total: float
+    proposed_total: float
+    discount_value: float
+    discount_percent: float
+    effective_margin_percent: float
+    minimum_margin_percent: float
+    status: CustomerProposalStatus = CustomerProposalStatus.PENDING
+    submitted_by: str = ""
+    notes: str = ""
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    decided_by: str = ""
+    decision_reason: str = ""
+    decided_at: datetime | None = None
+
+
 class CostSettings(BaseModel):
+    attach_institutional_page: bool = True
+    institutional_page_minimum: float = Field(default=10000, ge=0)
     default_margin_percent: float = Field(default=30, ge=0, lt=100)
+    minimum_effective_margin_percent: float = Field(default=20, ge=0, lt=100)
     default_item_utilization_percent: float = Field(default=80, gt=0, le=100)
     default_ipi_percent: float = Field(default=0, ge=0, le=100)
     default_cbs_percent: float = Field(default=0, ge=0, le=100)
     default_ibs_percent: float = Field(default=0, ge=0, le=100)
     default_cut_hourly_rate: float = Field(default=180, ge=0)
+    default_laser_cutting_speed_mm_min: float = Field(default=2000, gt=0)
+    default_laser_piercing_seconds: float = Field(default=1, ge=0)
     default_bend_hourly_rate: float = Field(default=120, ge=0)
+    bend_time_1_piece_minutes: float = Field(default=10, ge=0)
+    bend_time_2_pieces_minutes: float = Field(default=5, ge=0)
+    bend_time_3_pieces_minutes: float = Field(default=4, ge=0)
+    bend_time_4_to_5_pieces_minutes: float = Field(default=3, ge=0)
+    bend_time_6_plus_pieces_minutes: float = Field(default=2.5, ge=0)
     default_roll_hourly_rate: float = Field(default=150, ge=0)
     default_nesting_gap_mm: float = Field(default=5, ge=0, le=100)
     indirect_percent: float = Field(default=12, ge=0, le=100)

@@ -20,6 +20,7 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     password: str = Field(min_length=8, max_length=128)
     role: UserRole
+    permissions: list[str] | None = None
 
 
 class User(BaseModel):
@@ -29,6 +30,7 @@ class User(BaseModel):
     role: UserRole
     active: bool = True
     must_change_password: bool = True
+    permissions: list[str] | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -45,3 +47,9 @@ class LoginResult(BaseModel):
 class PasswordChange(BaseModel):
     current_password: str
     new_password: str = Field(min_length=8, max_length=128)
+
+
+class UserAccessUpdate(BaseModel):
+    role: UserRole | None = None
+    active: bool | None = None
+    permissions: list[str] | None = None

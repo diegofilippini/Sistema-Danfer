@@ -128,7 +128,8 @@ def test_service_ignores_material_and_supports_weight_pricing_and_small_batch(tm
     assert response.status_code == 201
     item = response.json()["items"][0]
     assert item["material_cost"] == 0
-    assert item["process_cost"] == 82.5
+    assert item["bend_estimated_minutes"] == 5
+    assert item["process_cost"] == 72.5
     assert response.json()["taxes"] == 0
     assert response.json()["total"] == response.json()["subtotal"]
 
@@ -141,6 +142,73 @@ def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:
     assert settings["default_sheet_width_mm"] == 1200
     assert settings["default_sheet_length_mm"] == 3000
     assert settings["alternative_minimum_gain_percent"] == 8
+
+
+def test_laser_uses_perimeter_piercings_and_preserves_additional_time(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    settings.update({
+        "default_laser_cutting_speed_mm_min": 1000,
+        "default_laser_piercing_seconds": 2,
+        "indirect_percent": 0,
+    })
+    assert client.put("/api/v1/commercial/settings/costs", json=settings).status_code == 200
+
+    payload = quote_payload(customer["id"])
+    payload["type"] = "servico"
+    payload["items"][0].update({
+        "cut_length_mm": 2000,
+        "piercings": 30,
+        "laser_additional_minutes": 1,
+        "laser_additional_reason": "Furações pequenas e demoradas",
+        "processes": [{"name": "Corte laser", "minutes": 99, "hourly_rate": 120}],
+    })
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    item = response.json()["items"][0]
+    assert item["laser_estimated_minutes"] == 3
+    assert item["laser_additional_minutes"] == 1
+    assert item["laser_additional_reason"] == "Furações pequenas e demoradas"
+    assert item["process_cost"] == 8
+
+
+def test_bend_time_table_and_additional_time_are_applied_per_piece(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    settings.update({"indirect_percent": 0, "small_bend_batch_surcharge": 0})
+    assert client.put("/api/v1/commercial/settings/costs", json=settings).status_code == 200
+    assert client.get("/api/v1/commercial/quote-bend-times").json() == {
+        "one": 10, "two": 5, "three": 4, "four_to_five": 3, "six_plus": 2.5,
+    }
+
+    for quantity, expected in ((1, 10), (2, 5), (3, 4), (5, 3), (6, 2.5)):
+        payload = quote_payload(customer["id"])
+        payload["type"] = "servico"
+        payload["items"] = [{
+            "code": f"DOB-{quantity}", "description": "Peça dobrada",
+            "quantity": quantity, "bend_additional_minutes": 1,
+            "bend_additional_reason": "Geometria com regulagem adicional",
+            "processes": [{"name": "Dobra", "minutes": 99, "hourly_rate": 60}],
+        }]
+        response = client.post("/api/v1/commercial/quotes", json=payload)
+        assert response.status_code == 201
+        item = response.json()["items"][0]
+        assert item["bend_estimated_minutes"] == expected
+        assert item["bend_additional_minutes"] == 1
+        assert item["process_cost"] == expected + 1
+
+    payload = quote_payload(customer["id"])
+    payload["type"] = "servico"
+    payload["items"] = [{
+        "code": "DOB-AJUSTE", "description": "Lote com ajuste manual", "quantity": 7,
+        "bend_estimated_minutes": 2.8, "bend_additional_minutes": .7,
+        "processes": [{"name": "Dobra", "minutes": 99, "hourly_rate": 60}],
+    }]
+    adjusted = client.post("/api/v1/commercial/quotes", json=payload).json()["items"][0]
+    assert adjusted["bend_estimated_minutes"] == 2.8
+    assert adjusted["process_cost"] == 3.5
 
 
 def test_quote_uses_admin_defaults_when_sensitive_fields_are_omitted(tmp_path: Path) -> None:
@@ -188,11 +256,12 @@ def test_sheet_selection_strip_costing_gap_and_inox_warning(tmp_path: Path) -> N
     response = client.post("/api/v1/commercial/quotes", json=payload)
     assert response.status_code == 201
     alternative, strip = response.json()["items"]
-    assert alternative["selected_sheet_width_mm"] == 1500
-    assert alternative["costing_method"] == "nesting_retangular"
-    assert alternative["applied_gap_mm"] == 3
-    assert "chapa alternativa" in alternative["costing_warnings"][0]
-    assert strip["costing_method"] == "faixa_de_chapa"
+    assert alternative["costing_method"] == "nesting_real"
+    assert alternative["nesting_calculation_source"] == "nesting_geometrico"
+    assert alternative["selected_sheet_count"] >= 1
+    assert 0 < alternative["calculated_utilization_percent"] <= 100
+    assert strip["costing_method"] == "nesting_real"
+    assert strip["nesting_calculation_source"] == "nesting_geometrico"
     assert any("riscos superficiais" in warning for warning in strip["costing_warnings"])
 
 
@@ -237,3 +306,80 @@ def test_large_quote_keeps_20_item_margins_ncav_routes_and_single_delivery(tmp_p
     assert quote["items"][19]["margin_percent"] == 30
     assert quote["items"][3]["nesting_mode"] == "forcar_ncav"
     assert [process["minutes"] for process in quote["items"][0]["processes"]] == [5, 2.5]
+
+
+def test_nesting_cost_precedence_is_engineering_plan_then_ncav_then_geometry(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    payload = quote_payload(customer["id"])
+    common = {"quantity": 4, "thickness_mm": 3, "width_mm": 300,
+              "length_mm": 400, "net_weight_kg": 10, "material_price_kg": 8}
+    payload["items"] = [
+        {**common, "code": "REAL", "description": "Plano aprovado", "material": "Aço A",
+         "nesting_plan": {"reference": "ENG-PLANO-001", "sheet_width_mm": 1500,
+                          "sheet_length_mm": 3000, "sheet_count": 2,
+                          "utilization_percent": 92, "waste_percent": 8}},
+        {**common, "code": "NCAV", "description": "NcAv manual", "material": "Aço B",
+         "nesting_mode": "forcar_ncav", "utilization_percent": 65},
+        {**common, "code": "AUTO", "description": "Nesting automático", "material": "Aço C",
+         "nesting_mode": "automatico"},
+    ]
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    real, ncav, automatic = response.json()["items"]
+    assert real["nesting_calculation_source"] == "plano_engenharia"
+    assert real["nesting_plan_reference"] == "ENG-PLANO-001"
+    assert real["selected_sheet_count"] == 2
+    assert real["calculated_utilization_percent"] == 92
+    assert ncav["nesting_calculation_source"] == "ncav"
+    assert ncav["calculated_utilization_percent"] == 65
+    assert automatic["nesting_calculation_source"] == "nesting_geometrico"
+    assert automatic["selected_sheet_count"] >= 1
+    assert real["material_cost"] < ncav["material_cost"]
+
+
+def test_customer_proposal_recalculates_margin_and_requires_admin_decision(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    settings.update({"indirect_percent": 0, "minimum_effective_margin_percent": 45})
+    assert client.put("/api/v1/commercial/settings/costs", json=settings).status_code == 200
+    payload = quote_payload(customer["id"])
+    payload.update({"type": "servico", "ipi_percent": 0})
+    payload["items"] = [{
+        "code": "NEG-1", "description": "Pedido negociado", "quantity": 1,
+        "manual_unit_price": 3000,
+        "processes": [{"name": "Terceiro", "minutes": 0, "hourly_rate": 0,
+                       "pricing_mode": "fixo", "fixed_cost": 1500}],
+    }]
+    quote = client.post("/api/v1/commercial/quotes", json=payload).json()
+    assert quote["total"] == 3000
+    client.post(f"/api/v1/commercial/quotes/{quote['id']}/status", json={"status": "enviado"})
+
+    submitted = client.post(f"/api/v1/commercial/quotes/{quote['id']}/customer-proposals", json={
+        "proposed_total": 2700, "submitted_by": "Orçamentista",
+        "notes": "Contraproposta recebida por telefone",
+    })
+    assert submitted.status_code == 201
+    pending = submitted.json()
+    proposal = pending["customer_proposals"][0]
+    assert pending["status"] == "aguardando_aprovacao_administrativa"
+    assert proposal["discount_value"] == 300
+    assert proposal["discount_percent"] == 10
+    assert proposal["effective_margin_percent"] == 44.44
+    assert proposal["minimum_margin_percent"] == 45
+    bypass = client.post(f"/api/v1/commercial/quotes/{quote['id']}/status", json={"status": "aprovado"})
+    assert bypass.status_code == 409
+
+    approved = client.post(
+        f"/api/v1/commercial/quotes/{quote['id']}/customer-proposals/{proposal['id']}/decision",
+        json={"approved": True, "decided_by": "Administrador", "reason": "Volume estratégico"},
+    )
+    assert approved.status_code == 200
+    result = approved.json()
+    assert result["status"] == "aprovado"
+    assert result["total"] == 2700
+    assert result["effective_margin_percent"] == 44.44
+    assert result["customer_proposals"][0]["status"] == "aprovada"
+    notifications = client.get("/api/v1/notifications", params={"role": "administrador"}).json()
+    assert any("Margem efetiva: 44.44%" in item["message"] for item in notifications)

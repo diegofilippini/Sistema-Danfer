@@ -11,6 +11,8 @@ from danfer_os.models.coordination import (
     BillingProfile, CompanyUnit, MessageChannel, MessageStatus, OutboundMessage,
     OutboundMessageCreate, RequestStatusChange, ServiceRequest, ServiceRequestCreate,
 )
+from danfer_os.models.operations import NotificationCreate
+from danfer_os.services.operations import OperationsService
 
 
 class CoordinationNotFoundError(LookupError):
@@ -18,8 +20,9 @@ class CoordinationNotFoundError(LookupError):
 
 
 class CoordinationService:
-    def __init__(self, storage_path: Path | None = None) -> None:
+    def __init__(self, storage_path: Path | None = None, notifications: OperationsService | None = None) -> None:
         self._storage_path = storage_path
+        self._notifications = notifications
         self._profiles = {
             CompanyUnit.DANFER: BillingProfile(unit="danfer", legal_name="Danfer Industrial"),
             CompanyUnit.DF: BillingProfile(unit="df", legal_name="DF"),
@@ -66,6 +69,13 @@ class CoordinationService:
         item = ServiceRequest(**data.model_dump(), number=f"SOL-{datetime.now():%Y}-{self._request_sequence:05d}")
         self._requests[item.id] = item
         self._save()
+        if self._notifications:
+            self._notifications.create_notification(NotificationCreate(
+                title=f"Nova solicitação {item.number}",
+                message=f"{item.subject} — solicitante: {item.requester}. Prazo: {item.due_date or 'não informado'}.",
+                audience=item.target_department,
+                recipient_role=self._department_role(item.target_department),
+            ))
         return item.model_copy(deep=True)
 
     def requests(self, status: str | None = None) -> list[ServiceRequest]:
@@ -87,7 +97,43 @@ class CoordinationService:
         })
         self._requests[request_id] = updated
         self._save()
+        if self._notifications:
+            details = f"Status alterado para {updated.status.value}."
+            if updated.assigned_to:
+                details += f" Responsável: {updated.assigned_to}."
+            if updated.promised_date:
+                details += f" Previsão: {updated.promised_date}."
+            if data.comment:
+                details += f" Comentário: {data.comment.message}"
+            self._notifications.create_notification(NotificationCreate(
+                title=f"Andamento da solicitação {updated.number}",
+                message=f"{updated.subject} — {details}",
+                audience="solicitante",
+                recipient_username=updated.requester,
+            ))
+            if data.assigned_to and data.assigned_to.casefold() != updated.requester.casefold():
+                self._notifications.create_notification(NotificationCreate(
+                    title=f"Solicitação atribuída: {updated.number}",
+                    message=f"Você foi definido como responsável por: {updated.subject}.",
+                    audience="responsável",
+                    recipient_username=data.assigned_to,
+                ))
         return updated.model_copy(deep=True)
+
+    @staticmethod
+    def _department_role(department: str) -> str:
+        normalized = department.casefold()
+        if "engenharia" in normalized:
+            return "engenharia"
+        if "pcp" in normalized or "planejamento" in normalized:
+            return "pcp"
+        if "produ" in normalized:
+            return "producao"
+        if "qualidade" in normalized:
+            return "qualidade"
+        if "comercial" in normalized or "venda" in normalized:
+            return "comercial"
+        return "administrador"
 
     def create_message(self, data: OutboundMessageCreate) -> OutboundMessage:
         action_url = ""

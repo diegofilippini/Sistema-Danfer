@@ -9,7 +9,7 @@ from ezdxf import bbox
 
 from danfer_os.models.engineering import (
     DxfAnalysis, DxfQuoteDraftRequest, DxfUpload, NestingPart, NestingPlacement,
-    NestingPlan, NestingRequest, NestingSheet, NestingSuggestion, SheetEvaluation,
+    NestingBatchPlan, NestingPlan, NestingRequest, NestingSheet, NestingSuggestion, SheetEvaluation,
 )
 from danfer_os.models.commercial import QuoteItemCreate, QuoteProcess
 
@@ -183,6 +183,53 @@ class EngineeringService:
         )
 
     @classmethod
+    def nesting_batch(cls, data: NestingRequest) -> NestingBatchPlan:
+        """Avalia todas as peças em quantas chapas forem necessárias."""
+        evaluations = []
+        total_requested = sum(part.quantity for part in data.parts)
+        for sheet in data.sheets:
+            remaining = {part.code: part.quantity for part in data.parts}
+            definitions = {part.code: part for part in data.parts}
+            sheet_count = placed_total = 0
+            while sum(remaining.values()) and sheet_count < 1000:
+                batch = [definitions[code].model_copy(update={"quantity": quantity})
+                         for code, quantity in remaining.items() if quantity]
+                placements, _ = cls._arrange(batch, sheet, data.gap_mm, data.edge_margin_mm)
+                if not placements:
+                    break
+                sheet_count += 1
+                placed_total += len(placements)
+                for placement in placements:
+                    remaining[placement.code] -= 1
+            used_area = sum(
+                part.width_mm * part.height_mm * (part.quantity - remaining[part.code])
+                for part in data.parts
+            )
+            utilization = used_area / (sheet.width_mm * sheet.length_mm * sheet_count) * 100 if sheet_count else 0
+            unplaced = [f"{code} × {quantity}" for code, quantity in remaining.items() if quantity]
+            evaluations.append((sheet, sheet_count, placed_total, unplaced, utilization))
+        selected = evaluations[0]
+        reason = "chapa padrão selecionada para o lote completo"
+        for option in evaluations[1:]:
+            if len(option[3]) < len(selected[3]):
+                selected = option
+                reason = "alternativa acomoda mais peças no lote completo"
+            elif len(option[3]) == len(selected[3]):
+                fewer_sheets = option[1] < selected[1]
+                gain = option[4] - selected[4]
+                if fewer_sheets or gain >= data.alternative_minimum_gain_percent:
+                    selected = option
+                    reason = "alternativa reduz chapas ou atinge o ganho mínimo"
+        sheet, sheet_count, placed_total, unplaced, utilization = selected
+        return NestingBatchPlan(
+            selected_sheet=sheet, sheet_count=max(sheet_count, 1),
+            placed_count=placed_total, unplaced=unplaced,
+            utilization_percent=round(utilization, 2),
+            waste_percent=round(100 - utilization, 2),
+            selection_reason=reason,
+        )
+
+    @classmethod
     def quote_drafts(cls, data: DxfQuoteDraftRequest) -> list[QuoteItemCreate]:
         drafts = []
         for upload in data.uploads:
@@ -196,6 +243,7 @@ class EngineeringService:
                 width_mm=analysis.width_mm, length_mm=analysis.height_mm,
                 net_weight_kg=float(Decimal(str(weight)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)), material_price_kg=data.material_price_kg,
                 cut_length_mm=analysis.cut_length_mm, piercings=analysis.piercings,
+                laser_estimated_minutes=round(minutes, 3),
                 nesting_mode=analysis.nesting_suggestion.value,
                 utilization_percent=max(round(analysis.fill_factor_percent, 2), 1),
                 processes=[QuoteProcess(name="Corte Laser", minutes=round(minutes, 3), hourly_rate=data.laser_hourly_rate)],

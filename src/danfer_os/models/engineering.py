@@ -92,6 +92,16 @@ class NestingPlan(BaseModel):
     selection_reason: str
 
 
+class NestingBatchPlan(BaseModel):
+    selected_sheet: NestingSheet
+    sheet_count: int = Field(gt=0)
+    placed_count: int = Field(ge=0)
+    unplaced: list[str] = Field(default_factory=list)
+    utilization_percent: float = Field(ge=0, le=100)
+    waste_percent: float = Field(ge=0, le=100)
+    selection_reason: str
+
+
 class DxfQuoteDraftRequest(BaseModel):
     uploads: list[DxfUpload] = Field(min_length=1, max_length=200)
     material: str = Field(default="", max_length=100)

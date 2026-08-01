@@ -6,3 +6,6 @@ __pycache__/
 .env
 data/
 work/
+.gh-auth/
+tmp/
+output/

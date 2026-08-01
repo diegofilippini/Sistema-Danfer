@@ -4,7 +4,7 @@ from xml.sax.saxutils import escape
 from urllib.parse import quote
 
 from danfer_os.models.engineering import (
-    DxfAnalysis, DxfQuoteDraftRequest, DxfRegistration, DxfUpload, NestingPlan,
+    DxfAnalysis, DxfQuoteDraftRequest, DxfRegistration, DxfUpload, NestingBatchPlan, NestingPlan,
     NestingRequest, NestingSheet,
 )
 from danfer_os.models.commercial import QuoteItemCreate
@@ -89,6 +89,10 @@ def create_router(service: EngineeringService, library: TechnicalLibrary, commer
     @router.post("/nesting/plan", response_model=NestingPlan)
     def nesting_plan(data: NestingRequest) -> NestingPlan:
         return service.nesting(resolved_nesting(data))
+
+    @router.post("/nesting/batch-plan", response_model=NestingBatchPlan)
+    def nesting_batch_plan(data: NestingRequest) -> NestingBatchPlan:
+        return service.nesting_batch(resolved_nesting(data))
 
     @router.post("/nesting/preview.svg")
     def nesting_preview(data: NestingRequest) -> Response:

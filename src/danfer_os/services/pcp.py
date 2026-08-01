@@ -19,6 +19,9 @@ from danfer_os.models.pcp import (
     WorkLog,
     WorkLogCreate,
     WorkLogType,
+    DirectProductionRequest,
+    DirectProductionRequestCreate,
+    DirectProductionRequestUpdate,
 )
 from danfer_os.services.bom import BomNotFoundError, BomService
 from danfer_os.services.technical_library import DocumentNotFoundError, TechnicalLibrary
@@ -62,6 +65,8 @@ class PcpService:
         }
         self._calendar: dict[date, CalendarException] = {}
         self._logs: dict[UUID, list[WorkLog]] = {}
+        self._direct_requests: dict[UUID, DirectProductionRequest] = {}
+        self._direct_request_sequence = 0
         self._load()
 
     def _load(self) -> None:
@@ -80,6 +85,9 @@ class PcpService:
             UUID(key): [WorkLog.model_validate(item) for item in values]
             for key, values in payload.get("logs", {}).items()
         }
+        direct = [DirectProductionRequest.model_validate(item) for item in payload.get("direct_requests", [])]
+        self._direct_requests = {item.id: item for item in direct}
+        self._direct_request_sequence = int(payload.get("direct_request_sequence", 0))
 
     def _save(self) -> None:
         if self._storage_path is None:
@@ -92,7 +100,31 @@ class PcpService:
             "work_centers": [item.model_dump(mode="json") for item in self._work_centers.values()],
             "calendar": [item.model_dump(mode="json") for item in self._calendar.values()],
             "logs": {str(key): [item.model_dump(mode="json") for item in values] for key, values in self._logs.items()},
+            "direct_request_sequence": self._direct_request_sequence,
+            "direct_requests": [item.model_dump(mode="json") for item in self._direct_requests.values()],
         }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def create_direct_request(self, data: DirectProductionRequestCreate) -> DirectProductionRequest:
+        self._direct_request_sequence += 1
+        item = DirectProductionRequest(
+            **data.model_dump(),
+            number=f"SP-{datetime.now():%Y}-{self._direct_request_sequence:05d}",
+        )
+        self._direct_requests[item.id] = item
+        self._save()
+        return item.model_copy(deep=True)
+
+    def direct_requests(self) -> list[DirectProductionRequest]:
+        return [item.model_copy(deep=True) for item in sorted(self._direct_requests.values(), key=lambda value: value.created_at, reverse=True)]
+
+    def update_direct_request(self, request_id: UUID, data: DirectProductionRequestUpdate) -> DirectProductionRequest:
+        current = self._direct_requests.get(request_id)
+        if current is None:
+            raise ProductionOrderNotFoundError(request_id)
+        updated = current.model_copy(update=data.model_dump(exclude_unset=True))
+        self._direct_requests[request_id] = updated
+        self._save()
+        return updated.model_copy(deep=True)
 
     def create(self, data: ProductionOrderCreate) -> ProductionOrder:
         try:

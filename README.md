@@ -6,7 +6,7 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.4.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.5.0`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
@@ -16,6 +16,13 @@ controle de acesso por perfil e API integrada.
 
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
+
+## Versão 1.5.0 — Custeio por nesting integrado
+
+- cálculo geométrico em lote por material e espessura, inclusive em múltiplas chapas;
+- custo de material baseado no aproveitamento efetivamente calculado;
+- precedência auditável: plano aprovado de Engenharia, NcAv informado, nesting geométrico e parâmetros administrativos;
+- registro da chapa escolhida, quantidade de chapas, aproveitamento, perda e origem do cálculo em cada item.
 
 ## Versão 1.4.0 — Orçamento denso e Manutenções administrativas
 
@@ -111,6 +118,10 @@ python -m venv .venv
 pip install -e ".[dev]"
 uvicorn danfer_os.main:app --reload
 ```
+
+## Push Web/PWA
+
+Para receber avisos fora da tela do sistema, publique a aplicação em HTTPS e configure `DANFER_VAPID_PUBLIC_KEY`, `DANFER_VAPID_PRIVATE_KEY` e `DANFER_VAPID_SUBJECT` no servidor. A chave privada nunca é enviada ao navegador. Sem essa configuração, a central interna continua funcionando normalmente.
 
 ## Testes
 

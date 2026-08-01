@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "danfer-industrial-os"
-version = "1.4.0"
+version = "1.5.0"
 description = "Sistema operacional industrial da Danfer"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -15,6 +15,7 @@ dependencies = [
     "xlrd>=2,<3",
     "reportlab>=4,<6",
     "ezdxf>=1.4,<2",
+    "pywebpush>=2,<3",
 ]
 
 [project.optional-dependencies]
