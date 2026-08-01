@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+import json
+from pathlib import Path
 from uuid import UUID
 
 from danfer_os.models.pcp import (
@@ -10,6 +12,13 @@ from danfer_os.models.pcp import (
     ProductionOrderCreate,
     ProductionOrderUpdate,
     ProductionStatus,
+    CalendarException,
+    CostVariance,
+    DailyCapacity,
+    WorkCenter,
+    WorkLog,
+    WorkLogCreate,
+    WorkLogType,
 )
 from danfer_os.services.bom import BomNotFoundError, BomService
 from danfer_os.services.technical_library import DocumentNotFoundError, TechnicalLibrary
@@ -24,6 +33,10 @@ class PcpValidationError(ValueError):
 
 
 class PcpService:
+    _default_operations = {
+        2: "Corte Laser", 3: "Guilhotina", 4: "Plasma", 5: "Dobra",
+        6: "Calandra", 7: "Prensa", 8: "Chanfro", 9: "Solda",
+    }
     _transitions = {
         ProductionStatus.PLANNED: {ProductionStatus.RELEASED, ProductionStatus.CANCELLED},
         ProductionStatus.RELEASED: {ProductionStatus.IN_PROGRESS, ProductionStatus.CANCELLED},
@@ -37,11 +50,49 @@ class PcpService:
         ProductionStatus.CANCELLED: set(),
     }
 
-    def __init__(self, library: TechnicalLibrary, boms: BomService) -> None:
+    def __init__(self, library: TechnicalLibrary, boms: BomService, storage_path: Path | None = None) -> None:
         self._library = library
         self._boms = boms
         self._orders: dict[UUID, ProductionOrder] = {}
         self._sequence = 0
+        self._storage_path = storage_path
+        self._work_centers: dict[int, WorkCenter] = {
+            code: WorkCenter(operation_erp_code=code, name=name)
+            for code, name in self._default_operations.items()
+        }
+        self._calendar: dict[date, CalendarException] = {}
+        self._logs: dict[UUID, list[WorkLog]] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if self._storage_path is None or not self._storage_path.exists():
+            return
+        payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
+        orders = [ProductionOrder.model_validate(item) for item in payload.get("orders", [])]
+        self._orders = {item.id: item for item in orders}
+        self._sequence = int(payload.get("sequence", 0))
+        centers = [WorkCenter.model_validate(item) for item in payload.get("work_centers", [])]
+        if centers:
+            self._work_centers = {item.operation_erp_code: item for item in centers}
+        exceptions = [CalendarException.model_validate(item) for item in payload.get("calendar", [])]
+        self._calendar = {item.date: item for item in exceptions}
+        self._logs = {
+            UUID(key): [WorkLog.model_validate(item) for item in values]
+            for key, values in payload.get("logs", {}).items()
+        }
+
+    def _save(self) -> None:
+        if self._storage_path is None:
+            return
+        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self._storage_path.write_text(json.dumps({
+            "version": 1,
+            "sequence": self._sequence,
+            "orders": [item.model_dump(mode="json") for item in self._orders.values()],
+            "work_centers": [item.model_dump(mode="json") for item in self._work_centers.values()],
+            "calendar": [item.model_dump(mode="json") for item in self._calendar.values()],
+            "logs": {str(key): [item.model_dump(mode="json") for item in values] for key, values in self._logs.items()},
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def create(self, data: ProductionOrderCreate) -> ProductionOrder:
         try:
@@ -71,6 +122,7 @@ class PcpService:
             requirements=requirements,
         )
         self._orders[order.id] = order
+        self._save()
         return order.model_copy(deep=True)
 
     def list(self, status: ProductionStatus | None = None) -> list[ProductionOrder]:
@@ -98,6 +150,7 @@ class PcpService:
             update={**changes, "updated_at": datetime.now(timezone.utc)}
         )
         self._orders[order_id] = updated
+        self._save()
         return updated.model_copy(deep=True)
 
     def sequence(self) -> list[ProductionOrder]:
@@ -133,3 +186,96 @@ class PcpService:
             groups.values(),
             key=lambda item: (item.material.casefold(), item.thickness_mm or 0),
         )
+
+    def set_work_center(self, center: WorkCenter) -> WorkCenter:
+        self._work_centers[center.operation_erp_code] = center
+        self._save()
+        return center.model_copy(deep=True)
+
+    def work_centers(self) -> list[WorkCenter]:
+        return [item.model_copy(deep=True) for item in sorted(self._work_centers.values(), key=lambda item: item.operation_erp_code)]
+
+    def set_calendar_exception(self, exception: CalendarException) -> CalendarException:
+        self._calendar[exception.date] = exception
+        self._save()
+        return exception.model_copy(deep=True)
+
+    def calendar(self, start: date, end: date) -> list[CalendarException]:
+        if end < start:
+            raise PcpValidationError("data final anterior à data inicial")
+        return [self._calendar[item].model_copy(deep=True) for item in sorted(self._calendar) if start <= item <= end]
+
+    def add_log(self, order_id: UUID, data: WorkLogCreate) -> WorkLog:
+        self.get(order_id)
+        if data.amount is not None:
+            cost = data.amount
+        elif data.type == WorkLogType.OPERATION:
+            center = self._work_centers.get(data.operation_erp_code or 0)
+            rate = center.hourly_rate if center else data.unit_cost
+            cost = data.minutes / 60 * rate
+        else:
+            cost = data.quantity * data.unit_cost
+        log = WorkLog(**data.model_dump(), calculated_cost=round(cost, 2))
+        self._logs.setdefault(order_id, []).append(log)
+        self._save()
+        return log.model_copy(deep=True)
+
+    def logs(self, order_id: UUID) -> list[WorkLog]:
+        self.get(order_id)
+        return [item.model_copy(deep=True) for item in self._logs.get(order_id, [])]
+
+    def costs(self, order_id: UUID) -> CostVariance:
+        order = self.get(order_id)
+        totals = {kind: 0.0 for kind in WorkLogType}
+        for log in self._logs.get(order_id, []):
+            totals[log.type] += log.calculated_cost
+        estimated = order.estimated_material_cost + order.estimated_process_cost
+        actual = sum(totals.values())
+        variance = actual - estimated
+        return CostVariance(
+            order_id=order.id, order_number=order.number,
+            estimated_material_cost=order.estimated_material_cost,
+            estimated_process_cost=order.estimated_process_cost,
+            estimated_total_cost=round(estimated, 2),
+            actual_material_cost=round(totals[WorkLogType.MATERIAL], 2),
+            actual_process_cost=round(totals[WorkLogType.OPERATION], 2),
+            actual_external_cost=round(totals[WorkLogType.EXTERNAL], 2),
+            actual_quality_cost=round(totals[WorkLogType.QUALITY], 2),
+            actual_total_cost=round(actual, 2), variance_value=round(variance, 2),
+            variance_percent=round(variance / estimated * 100, 2) if estimated else None,
+        )
+
+    def daily_capacity(self, start: date, days: int = 7) -> list[DailyCapacity]:
+        if not 1 <= days <= 62:
+            raise PcpValidationError("período permitido: 1 a 62 dias")
+        result: list[DailyCapacity] = []
+        for offset in range(days):
+            current_date = start + timedelta(days=offset)
+            for center in self._work_centers.values():
+                if not center.active:
+                    continue
+                available = 0 if current_date.weekday() >= 5 else center.daily_capacity_minutes
+                if current_date in self._calendar:
+                    available = self._calendar[current_date].available_minutes
+                loads: list[tuple[str, float]] = []
+                for order in self._orders.values():
+                    if order.due_date != current_date or order.status in {ProductionStatus.COMPLETED, ProductionStatus.CANCELLED}:
+                        continue
+                    try:
+                        product = self._library.get(order.product_id)
+                    except DocumentNotFoundError:
+                        # Mantém OPs históricas legíveis mesmo quando o cadastro técnico
+                        # de origem não está mais disponível para recalcular sua carga.
+                        continue
+                    minutes = sum(step.estimated_minutes * order.quantity for step in product.routing if step.erp_code == center.operation_erp_code)
+                    if minutes:
+                        loads.append((order.number, minutes))
+                planned = sum(minutes for _, minutes in loads)
+                result.append(DailyCapacity(
+                    date=current_date, operation_erp_code=center.operation_erp_code,
+                    operation=center.name, available_minutes=round(available, 2),
+                    planned_minutes=round(planned, 2), remaining_minutes=round(available - planned, 2),
+                    utilization_percent=round(planned / available * 100, 2) if available else (100 if planned else 0),
+                    overloaded=planned > available, orders=[number for number, _ in loads],
+                ))
+        return result

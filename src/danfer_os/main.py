@@ -37,10 +37,11 @@ def create_app(
     data_dir: Path = Path("data"),
     enforce_auth: bool = False,
 ) -> FastAPI:
+    isolated_test_mode = library is not None and data_dir == Path("data")
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.5.0",
+        version="0.6.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -53,7 +54,11 @@ def create_app(
     )
     bom_service = BomService(library)
     app.include_router(create_bom_router(bom_service), prefix="/api/v1")
-    pcp_service = PcpService(library, bom_service)
+    pcp_service = PcpService(
+        library,
+        bom_service,
+        None if isolated_test_mode else data_dir / "pcp.json",
+    )
     integration_service = IntegrationService(library)
     commercial_service = CommercialService(data_dir / "commercial.json")
     operations_service = OperationsService(data_dir / "operations.json")

@@ -140,6 +140,18 @@ async function pcp() {
   $("#kanban").innerHTML = groups.map(([status, label]) =>
     `<div class="lane"><h3>${label} · ${orders.filter(order => order.status === status).length}</h3>${orders.filter(order => order.status === status).map(order => `<div class="card"><b>${esc(order.number)}</b><small>Prazo ${order.due_date} · ${order.quantity} un</small></div>`).join("")}</div>`
   ).join("");
+  const start = $("#capacity-start").value || new Date().toISOString().slice(0,10);
+  $("#capacity-start").value = start;
+  const capacity = await req(`/pcp/capacity/daily?start=${start}&days=7`);
+  $("#capacity-table").innerHTML = table(
+    ["Data","Operação","Disponível","Planejado","Uso","Situação"],
+    capacity.filter(item => item.planned_minutes || item.overloaded).map(item => `<tr><td>${new Date(item.date + "T12:00:00").toLocaleDateString("pt-BR")}</td><td>${item.operation_erp_code} · ${esc(item.operation)}</td><td>${item.available_minutes} min</td><td><b>${item.planned_minutes} min</b><br><small>${esc(item.orders.join(", "))}</small></td><td>${item.utilization_percent}%</td><td>${pill(item.overloaded ? "sobrecarregada" : "planejada")}</td></tr>`)
+  );
+  const costs = await Promise.all(orders.map(order => req(`/pcp/orders/${order.id}/costs`)));
+  $("#cost-variance-table").innerHTML = table(
+    ["OP","Estimado","Realizado","Variação","%"],
+    costs.map(item => `<tr><td><b>${esc(item.order_number)}</b></td><td>${money(item.estimated_total_cost)}</td><td>${money(item.actual_total_cost)}</td><td>${money(item.variance_value)}</td><td>${item.variance_percent == null ? "—" : item.variance_percent + "%"}</td></tr>`)
+  );
 }
 
 async function integrations() {
@@ -200,6 +212,13 @@ dialogControls("#new-quality", "#quality-dialog", ".close-quality");
 dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
 dialogControls("#new-material", "#material-dialog", ".close-material");
 dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
+dialogControls("#new-work-log", "#work-log-dialog", ".close-work-log");
+
+$("#refresh-capacity").onclick = pcp;
+$("#new-work-log").addEventListener("click", async () => {
+  const orders = await req("/pcp/orders");
+  $("#work-log-order").innerHTML = orders.map(order => `<option value="${order.id}">${esc(order.number)}</option>`).join("");
+});
 
 $("#search").oninput = event => library(event.target.value);
 $("#client-search").oninput = event => crm(event.target.value);
@@ -351,6 +370,19 @@ $("#maintenance-form").onsubmit = async event => {
   if (!data.scheduled_date) delete data.scheduled_date;
   await req("/maintenance", {method:"POST", body:JSON.stringify(data)});
   $("#maintenance-dialog").close(); event.target.reset(); await maintenance();
+};
+
+$("#work-log-form").onsubmit = async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  const orderId = data.order_id; delete data.order_id;
+  ["minutes", "quantity", "unit_cost"].forEach(key => data[key] = Number(data[key]));
+  if (data.operation_erp_code) data.operation_erp_code = Number(data.operation_erp_code); else delete data.operation_erp_code;
+  if (data.amount) data.amount = Number(data.amount); else delete data.amount;
+  try {
+    await req(`/pcp/orders/${orderId}/logs`, {method:"POST", body:JSON.stringify(data)});
+    $("#work-log-dialog").close(); event.target.reset(); await pcp();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
 $("#login-form").onsubmit = async event => {
