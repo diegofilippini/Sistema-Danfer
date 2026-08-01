@@ -66,7 +66,7 @@ def test_quote_calculation_revision_status_and_pdf(tmp_path: Path) -> None:
     quote = created.json()
     assert quote["number"].startswith("ORC-")
     assert quote["items"][0]["material_cost"] == 62.5
-    assert quote["items"][0]["process_cost"] == 40
+    assert quote["items"][0]["process_cost"] == 57.5
     assert quote["total"] > quote["subtotal"]
     assert quote["gross_profit"] > 0
 
@@ -103,3 +103,36 @@ def test_crm_search_and_duplicate_document(tmp_path: Path) -> None:
         json={"name": "Outro", "document": "12.345.678/0001-90"},
     )
     assert duplicate.status_code == 409
+
+
+def test_service_ignores_material_and_supports_weight_pricing_and_small_batch(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    payload = quote_payload(customer["id"])
+    payload["type"] = "servico"
+    payload["items"][0]["quantity"] = 2
+    payload["items"][0]["processes"] = [
+        {
+            "name": "Calandra",
+            "minutes": 0,
+            "hourly_rate": 0,
+            "pricing_mode": "peso",
+            "weight_rate": 4.5,
+        },
+        {"name": "Dobra", "minutes": 10, "hourly_rate": 120},
+    ]
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    item = response.json()["items"][0]
+    assert item["material_cost"] == 0
+    assert item["process_cost"] == 82.5
+
+
+def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    assert settings["default_margin_percent"] == 30
+    assert settings["small_bend_batch_limit"] == 5
+    assert settings["default_sheet_width_mm"] == 1200
+    assert settings["default_sheet_length_mm"] == 3000
+    assert settings["alternative_minimum_gain_percent"] == 8

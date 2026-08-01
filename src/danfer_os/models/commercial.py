@@ -74,11 +74,20 @@ class NestingMode(StrEnum):
     DISABLED = "desabilitado"
 
 
+class ProcessPricingMode(StrEnum):
+    TIME = "tempo"
+    WEIGHT = "peso"
+    FIXED = "fixo"
+
+
 class QuoteProcess(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     minutes: float = Field(ge=0)
     hourly_rate: float = Field(ge=0)
     external_cost: float = Field(default=0, ge=0)
+    pricing_mode: ProcessPricingMode = ProcessPricingMode.TIME
+    weight_rate: float = Field(default=0, ge=0)
+    fixed_cost: float = Field(default=0, ge=0)
 
 
 class QuoteItemCreate(BaseModel):
@@ -124,7 +133,7 @@ class QuoteCreate(BaseModel):
     freight_payer: FreightPayer = FreightPayer.CUSTOMER
     nature_operation: str = Field(default="Venda de produção", max_length=120)
     tax_scenario: str = Field(default="padrao", max_length=80)
-    margin_percent: float = Field(default=25, ge=0, lt=100)
+    margin_percent: float = Field(default=30, ge=0, lt=100)
     ipi_percent: float = Field(default=0, ge=0, le=100)
     cbs_percent: float = Field(default=0, ge=0, le=100)
     ibs_percent: float = Field(default=0, ge=0, le=100)
@@ -186,7 +195,11 @@ class StatusChange(BaseModel):
 
 
 class CostSettings(BaseModel):
+    default_margin_percent: float = Field(default=30, ge=0, lt=100)
     indirect_percent: float = Field(default=12, ge=0, le=100)
+    small_bend_batch_limit: int = Field(default=5, ge=0)
+    small_bend_batch_surcharge: float = Field(default=35, ge=0)
+    strip_costing_threshold_percent: float = Field(default=30, ge=0, le=100)
     large_part_threshold_percent: float = Field(default=60, gt=0, le=100)
     large_part_loss_percent: float = Field(default=15, ge=0, le=100)
     default_sheet_width_mm: float = Field(default=1200, gt=0)

@@ -7,6 +7,7 @@ const esc = value => String(value ?? "").replace(
 const money = value => Number(value || 0).toLocaleString("pt-BR", {
   style: "currency", currency: "BRL"
 });
+let pendingQuoteItems = [];
 
 async function req(path, options = {}) {
   const response = await fetch(api + path, {
@@ -222,6 +223,8 @@ $("#client-form").onsubmit = async event => {
 };
 
 $("#new-quote").addEventListener("click", async () => {
+  pendingQuoteItems = [];
+  renderPendingQuoteItems();
   const clients = await req("/commercial/clients");
   $("#quote-client").innerHTML = clients.map(client =>
     `<option value="${client.id}">${esc(client.name)}</option>`
@@ -230,12 +233,54 @@ $("#new-quote").addEventListener("click", async () => {
   $("#quote-form [name=valid_until]").value = validity.toISOString().slice(0,10);
 });
 
-$("#quote-form").onsubmit = async event => {
-  event.preventDefault();
-  const form = Object.fromEntries(new FormData(event.target));
+function quoteItemFromForm(form) {
   const processes = [];
   if (Number(form.cut_minutes)) processes.push({name:"Corte laser", minutes:Number(form.cut_minutes), hourly_rate:Number(form.cut_rate), external_cost:0});
   if (Number(form.bend_minutes)) processes.push({name:"Dobra", minutes:Number(form.bend_minutes), hourly_rate:Number(form.bend_rate), external_cost:0});
+  if (Number(form.roll_value)) processes.push(form.roll_pricing_mode === "peso"
+    ? {name:"Calandra", minutes:0, hourly_rate:0, pricing_mode:"peso", weight_rate:Number(form.roll_value), external_cost:0}
+    : {name:"Calandra", minutes:Number(form.roll_value), hourly_rate:150, pricing_mode:"tempo", external_cost:0});
+  return {
+    code:form.item_code, description:form.item_description,
+    quantity:Number(form.item_quantity), material:form.item_material,
+    thickness_mm:form.item_thickness ? Number(form.item_thickness) : null,
+    net_weight_kg:Number(form.item_weight), material_price_kg:Number(form.item_material_price),
+    utilization_percent:Number(form.item_utilization), margin_percent:Number(form.item_margin_percent),
+    notes:form.item_notes, processes
+  };
+}
+
+function renderPendingQuoteItems() {
+  $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) =>
+    `<div class="pending-item"><span><b>${esc(item.code)}</b> · ${esc(item.description)} · ${item.quantity} un</span><button type="button" data-remove-item="${index}">Remover</button></div>`
+  ).join("");
+  document.querySelectorAll("[data-remove-item]").forEach(button => button.onclick = () => {
+    pendingQuoteItems.splice(Number(button.dataset.removeItem), 1);
+    renderPendingQuoteItems();
+  });
+}
+
+$("#add-quote-item").onclick = () => {
+  const form = Object.fromEntries(new FormData($("#quote-form")));
+  if (!form.item_code || !form.item_description || !Number(form.item_quantity)) {
+    $("#quote-form .dialog-error").textContent = "Preencha código, descrição e quantidade do item.";
+    return;
+  }
+  pendingQuoteItems.push(quoteItemFromForm(form));
+  renderPendingQuoteItems();
+  ["item_code","item_description","item_material","item_thickness","item_notes"].forEach(name => $("#quote-form [name=" + name + "]").value = "");
+  $("#quote-form .dialog-error").textContent = "";
+};
+
+$("#quote-form").onsubmit = async event => {
+  event.preventDefault();
+  const form = Object.fromEntries(new FormData(event.target));
+  const currentItem = form.item_code && form.item_description ? quoteItemFromForm(form) : null;
+  const items = [...pendingQuoteItems, ...(currentItem ? [currentItem] : [])];
+  if (!items.length) {
+    event.target.querySelector(".dialog-error").textContent = "Adicione pelo menos um item à proposta.";
+    return;
+  }
   const payload = {
     type:form.type, client_id:form.client_id, requester:form.requester,
     prepared_by:form.prepared_by,
@@ -245,18 +290,11 @@ $("#quote-form").onsubmit = async event => {
     margin_percent:Number(form.margin_percent), ipi_percent:Number(form.ipi_percent),
     cbs_percent:Number(form.cbs_percent), ibs_percent:Number(form.ibs_percent),
     discount_value:Number(form.discount_value), observations:form.observations,
-    items:[{
-      code:form.item_code, description:form.item_description,
-      quantity:Number(form.item_quantity), material:form.item_material,
-      thickness_mm:form.item_thickness ? Number(form.item_thickness) : null,
-      net_weight_kg:Number(form.item_weight), material_price_kg:Number(form.item_material_price),
-      utilization_percent:Number(form.item_utilization),
-      margin_percent:Number(form.item_margin_percent), notes:form.item_notes, processes
-    }]
+    items
   };
   try {
     await req("/commercial/quotes", {method:"POST", body:JSON.stringify(payload)});
-    $("#quote-dialog").close(); event.target.reset(); await quotes();
+    $("#quote-dialog").close(); event.target.reset(); pendingQuoteItems = []; await quotes();
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 

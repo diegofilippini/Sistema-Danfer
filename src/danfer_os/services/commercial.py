@@ -156,11 +156,26 @@ class CommercialService:
         )
         if large_part_loss:
             material_consumption *= 1 + self._settings.large_part_loss_percent / 100
-        material_cost = material_consumption * data.material_price_kg
-        process_cost = sum(
-            process.minutes / 60 * process.hourly_rate + process.external_cost
-            for process in data.processes
+        material_cost = (
+            0
+            if quote_type == "servico"
+            else material_consumption * data.material_price_kg
         )
+        process_cost = 0.0
+        for process in data.processes:
+            if process.pricing_mode.value == "peso":
+                cost = data.net_weight_kg * process.weight_rate
+            elif process.pricing_mode.value == "fixo":
+                cost = process.fixed_cost
+            else:
+                cost = process.minutes / 60 * process.hourly_rate
+            cost += process.external_cost
+            if (
+                "dobra" in process.name.casefold()
+                and data.quantity <= self._settings.small_bend_batch_limit
+            ):
+                cost += self._settings.small_bend_batch_surcharge / data.quantity
+            process_cost += cost
         base_cost = material_cost + process_cost
         indirect = base_cost * self._settings.indirect_percent / 100
         total_cost = base_cost + indirect

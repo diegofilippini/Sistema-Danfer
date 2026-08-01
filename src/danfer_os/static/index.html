@@ -93,8 +93,9 @@
     <label>Preço material (R$/kg)<input name="item_material_price" type="number" value="0" step=".01"></label><label>Aproveitamento (%)<input name="item_utilization" type="number" value="80" step=".1"></label>
     <label>Tempo corte (min)<input name="cut_minutes" type="number" value="0" step=".1"></label><label>Valor hora corte<input name="cut_rate" type="number" value="180" step=".01"></label>
     <label>Tempo dobra (min)<input name="bend_minutes" type="number" value="0" step=".1"></label><label>Valor hora dobra<input name="bend_rate" type="number" value="120" step=".01"></label>
+    <label>Calandra<select name="roll_pricing_mode"><option value="tempo">Por tempo</option><option value="peso">Por peso</option></select></label><label>Calandra min./R$ por kg<input name="roll_value" type="number" value="0" step=".01"></label>
     <label class="wide">Observações do item<input name="item_notes"></label>
-  </div></div>
+  </div><div class="item-actions"><button type="button" id="add-quote-item">+ Adicionar item à proposta</button></div><div id="pending-quote-items"></div></div>
   <div class="form-grid"><label class="wide">Observações e condições comerciais<textarea name="observations"></textarea></label></div>
   <div class="dialog-error"></div><footer><button type="button" class="cancel close-quote">Cancelar</button><button>Calcular e salvar proposta</button></footer>
 </form></dialog>
