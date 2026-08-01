@@ -1,4 +1,4 @@
-# Danfer Industrial OS 1.3.0 — Guia operacional
+# Danfer Industrial OS 1.4.0 — Guia operacional
 
 ## Inicialização e acesso
 
@@ -32,6 +32,11 @@ custo real.
 - Venda destaca somente IPI; serviço apresenta o valor final sem linha tributária.
 - Escolha Danfer ou DF como unidade de faturamento.
 - A proposta PDF inclui contato e QR Code do WhatsApp institucional.
+- O novo orçamento usa tabela densa para visualizar 20 itens ou mais.
+- A entrega é definida uma única vez e vale para todos os itens.
+- Cada item aceita margem própria e NcAv quando o nesting avançado estiver ativo.
+- Roteiros padrão preenchem processos e tempos rapidamente; os minutos podem ser ajustados no item.
+- Custos, preços-base, valores-hora, impostos e regras de nesting ficam em Manutenções administrativas.
 
 ## Segurança, dados e recuperação
 

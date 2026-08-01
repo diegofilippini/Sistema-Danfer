@@ -27,6 +27,21 @@ def test_material_catalog_persists_and_erp_operations_are_seeded(tmp_path: Path)
         (2, "Corte Laser"), (3, "Guilhotina"), (4, "Plasma"), (5, "Dobra"),
         (6, "Calandra"), (7, "Prensa"), (8, "Chanfro"), (9, "Solda"),
     ]
+    templates = restarted.get("/api/v1/catalogs/routing-templates").json()
+    assert any(item["name"] == "Corte + Dobra" for item in templates)
+    created_template = restarted.post("/api/v1/catalogs/routing-templates", json={
+        "name": "Roteiro de teste",
+        "description": "Seleção rápida",
+        "steps": [
+            {"operation_erp_code": 2, "process": "Corte Laser", "default_minutes": 7},
+            {"operation_erp_code": 9, "process": "Solda", "default_minutes": 12},
+        ],
+    })
+    assert created_template.status_code == 201
+    restarted_again = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
+    assert any(item["name"] == "Roteiro de teste" for item in restarted_again.get(
+        "/api/v1/catalogs/routing-templates"
+    ).json())
 
 
 def test_dxf_registration_creates_searchable_technical_record(tmp_path: Path) -> None:

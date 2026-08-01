@@ -143,6 +143,32 @@ def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:
     assert settings["alternative_minimum_gain_percent"] == 8
 
 
+def test_quote_uses_admin_defaults_when_sensitive_fields_are_omitted(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    settings.update({
+        "default_margin_percent": 35,
+        "default_item_utilization_percent": 76,
+        "default_ipi_percent": 7,
+        "default_cbs_percent": 1.2,
+        "default_ibs_percent": 0.3,
+    })
+    assert client.put("/api/v1/commercial/settings/costs", json=settings).status_code == 200
+    payload = quote_payload(customer["id"])
+    for field in ("margin_percent", "ipi_percent", "cbs_percent", "ibs_percent"):
+        payload.pop(field)
+    payload["items"][0].pop("margin_percent")
+    payload["items"][0].pop("utilization_percent")
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    quote = response.json()
+    assert quote["margin_percent"] == 35
+    assert quote["ipi_percent"] == 7
+    assert quote["items"][0]["utilization_percent"] == 76
+    assert quote["taxes"] == round(quote["subtotal"] * .07, 2)
+
+
 def test_sheet_selection_strip_costing_gap_and_inox_warning(tmp_path: Path) -> None:
     client = commercial_client(tmp_path)
     customer = create_client(client)
@@ -168,3 +194,46 @@ def test_sheet_selection_strip_costing_gap_and_inox_warning(tmp_path: Path) -> N
     assert "chapa alternativa" in alternative["costing_warnings"][0]
     assert strip["costing_method"] == "faixa_de_chapa"
     assert any("riscos superficiais" in warning for warning in strip["costing_warnings"])
+
+
+def test_omitted_material_price_is_resolved_from_protected_catalog(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    client.post("/api/v1/catalogs/materials", json={
+        "erp_code": "CH-3", "description": "Aço catálogo", "thickness_mm": 3,
+        "price_per_kg": 10,
+    })
+    payload = quote_payload(customer["id"])
+    payload["items"][0].update({"material": "Aço catálogo", "thickness_mm": 3})
+    payload["items"][0].pop("material_price_kg")
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    assert response.json()["items"][0]["material_price_kg"] == 10
+
+
+def test_large_quote_keeps_20_item_margins_ncav_routes_and_single_delivery(tmp_path: Path) -> None:
+    client = commercial_client(tmp_path)
+    customer = create_client(client)
+    delivery = str(date.today() + timedelta(days=25))
+    items = [{
+        "code": f"ITEM-{index:02d}", "description": f"Peça industrial {index:02d}",
+        "quantity": index, "material": "Aço carbono", "thickness_mm": 3,
+        "width_mm": 100 + index, "length_mm": 200 + index,
+        "net_weight_kg": 2, "material_price_kg": 8,
+        "nesting_mode": "forcar_ncav" if index % 4 == 0 else "automatico",
+        "utilization_percent": 75, "margin_percent": 20 + index / 2,
+        "processes": [
+            {"name": "Corte Laser", "minutes": 4 + index, "hourly_rate": 0},
+            {"name": "Dobra", "minutes": 2 + index / 2, "hourly_rate": 0},
+        ],
+    } for index in range(1, 21)]
+    payload = quote_payload(customer["id"])
+    payload.update({"expected_delivery": delivery, "items": items})
+    response = client.post("/api/v1/commercial/quotes", json=payload)
+    assert response.status_code == 201
+    quote = response.json()
+    assert len(quote["items"]) == 20
+    assert quote["expected_delivery"] == delivery
+    assert quote["items"][19]["margin_percent"] == 30
+    assert quote["items"][3]["nesting_mode"] == "forcar_ncav"
+    assert [process["minutes"] for process in quote["items"][0]["processes"]] == [5, 2.5]

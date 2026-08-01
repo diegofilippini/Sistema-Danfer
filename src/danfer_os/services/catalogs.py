@@ -6,7 +6,10 @@ from pathlib import Path
 from threading import RLock
 from uuid import UUID
 
-from danfer_os.models.catalogs import Material, MaterialCreate, MaterialUpdate, Operation, OperationUpdate
+from danfer_os.models.catalogs import (
+    Material, MaterialCreate, MaterialUpdate, Operation, OperationUpdate,
+    RoutingTemplate, RoutingTemplateCreate, RoutingTemplateStep, RoutingTemplateUpdate,
+)
 
 
 ERP_OPERATIONS = {
@@ -19,6 +22,15 @@ ERP_OPERATIONS = {
     8: "Chanfro",
     9: "Solda",
 }
+
+DEFAULT_ROUTING_TEMPLATES = (
+    ("Corte Laser", [(2, "Corte Laser", 5)]),
+    ("Corte + Dobra", [(2, "Corte Laser", 5), (5, "Dobra", 5)]),
+    ("Corte + Calandra", [(2, "Corte Laser", 5), (6, "Calandra", 8)]),
+    ("Corte + Dobra + Solda", [(2, "Corte Laser", 5), (5, "Dobra", 5), (9, "Solda", 10)]),
+    ("Guilhotina + Dobra", [(3, "Guilhotina", 4), (5, "Dobra", 5)]),
+    ("Plasma + Chanfro + Solda", [(4, "Plasma", 8), (8, "Chanfro", 6), (9, "Solda", 10)]),
+)
 
 
 class CatalogNotFoundError(LookupError):
@@ -33,6 +45,17 @@ class CatalogService:
         self._operations: dict[int, Operation] = {
             code: Operation(erp_code=code, name=name) for code, name in ERP_OPERATIONS.items()
         }
+        self._routing_templates: dict[UUID, RoutingTemplate] = {
+            template.id: template
+            for name, raw_steps in DEFAULT_ROUTING_TEMPLATES
+            for template in [RoutingTemplate(
+                name=name,
+                description="Roteiro padrão recuperado para seleção rápida no orçamento.",
+                steps=[RoutingTemplateStep(
+                    operation_erp_code=code, process=process, default_minutes=minutes
+                ) for code, process, minutes in raw_steps],
+            )]
+        }
         self._load()
 
     def _load(self) -> None:
@@ -45,15 +68,23 @@ class CatalogService:
         for raw in payload.get("operations", []):
             operation = Operation.model_validate(raw)
             self._operations[operation.erp_code] = operation
+        if "routing_templates" in payload:
+            self._routing_templates = {
+                item.id: item
+                for item in map(RoutingTemplate.model_validate, payload["routing_templates"])
+            }
 
     def _save(self) -> None:
         if self._storage_path is None:
             return
         self._storage_path.parent.mkdir(parents=True, exist_ok=True)
         self._storage_path.write_text(json.dumps({
-            "version": 1,
+            "version": 2,
             "materials": [item.model_dump(mode="json") for item in self._materials.values()],
             "operations": [item.model_dump(mode="json") for item in self._operations.values()],
+            "routing_templates": [
+                item.model_dump(mode="json") for item in self._routing_templates.values()
+            ],
         }, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def create_material(self, data: MaterialCreate) -> Material:
@@ -105,5 +136,31 @@ class CatalogService:
                 "updated_at": datetime.now(timezone.utc),
             })
             self._operations[erp_code] = updated
+            self._save()
+        return updated.model_copy(deep=True)
+
+    def list_routing_templates(self, active: bool | None = None) -> list[RoutingTemplate]:
+        items = list(self._routing_templates.values())
+        if active is not None:
+            items = [item for item in items if item.active is active]
+        return [item.model_copy(deep=True) for item in sorted(items, key=lambda item: item.name)]
+
+    def create_routing_template(self, data: RoutingTemplateCreate) -> RoutingTemplate:
+        with self._lock:
+            template = RoutingTemplate(**data.model_dump())
+            self._routing_templates[template.id] = template
+            self._save()
+        return template.model_copy(deep=True)
+
+    def update_routing_template(self, template_id: UUID, data: RoutingTemplateUpdate) -> RoutingTemplate:
+        with self._lock:
+            current = self._routing_templates.get(template_id)
+            if current is None:
+                raise CatalogNotFoundError(template_id)
+            updated = current.model_copy(update={
+                **data.model_dump(exclude_unset=True),
+                "updated_at": datetime.now(timezone.utc),
+            })
+            self._routing_templates[template_id] = updated
             self._save()
         return updated.model_copy(deep=True)

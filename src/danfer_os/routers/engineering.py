@@ -5,16 +5,41 @@ from urllib.parse import quote
 
 from danfer_os.models.engineering import (
     DxfAnalysis, DxfQuoteDraftRequest, DxfRegistration, DxfUpload, NestingPlan,
-    NestingRequest,
+    NestingRequest, NestingSheet,
 )
 from danfer_os.models.commercial import QuoteItemCreate
 from danfer_os.models.technical_document import DocumentCategory, DocumentCreate, RoutingStep, TechnicalDocument
 from danfer_os.services.engineering import DxfAnalysisError, EngineeringService
 from danfer_os.services.technical_library import TechnicalLibrary
+from danfer_os.services.commercial import CommercialService
 
 
-def create_router(service: EngineeringService, library: TechnicalLibrary) -> APIRouter:
+def create_router(service: EngineeringService, library: TechnicalLibrary, commercial: CommercialService | None = None) -> APIRouter:
     router = APIRouter(prefix="/engineering", tags=["engenharia"])
+
+    def resolved_nesting(data: NestingRequest) -> NestingRequest:
+        if commercial is None:
+            return NestingRequest(
+                **data.model_dump(exclude_none=True),
+                **({"sheets": [
+                    NestingSheet(name="Padrão 1200 × 3000", width_mm=1200, length_mm=3000),
+                    NestingSheet(name="Alternativa 1500 × 3000", width_mm=1500, length_mm=3000),
+                ]} if data.sheets is None else {}),
+                **({"gap_mm": 5} if data.gap_mm is None else {}),
+                **({"edge_margin_mm": 10} if data.edge_margin_mm is None else {}),
+                **({"alternative_minimum_gain_percent": 8} if data.alternative_minimum_gain_percent is None else {}),
+            )
+        settings = commercial.settings()
+        updates = {
+            "sheets": data.sheets or [
+                NestingSheet(name="Padrão", width_mm=settings.default_sheet_width_mm, length_mm=settings.default_sheet_length_mm),
+                NestingSheet(name="Alternativa", width_mm=settings.alternative_sheet_width_mm, length_mm=settings.alternative_sheet_length_mm),
+            ],
+            "gap_mm": data.gap_mm if data.gap_mm is not None else settings.default_nesting_gap_mm,
+            "edge_margin_mm": data.edge_margin_mm if data.edge_margin_mm is not None else settings.sheet_edge_margin_mm,
+            "alternative_minimum_gain_percent": data.alternative_minimum_gain_percent if data.alternative_minimum_gain_percent is not None else settings.alternative_minimum_gain_percent,
+        }
+        return data.model_copy(update=updates)
 
     @router.post("/dxf/analyze", response_model=DxfAnalysis)
     def analyze_dxf(upload: DxfUpload) -> DxfAnalysis:
@@ -63,11 +88,11 @@ def create_router(service: EngineeringService, library: TechnicalLibrary) -> API
 
     @router.post("/nesting/plan", response_model=NestingPlan)
     def nesting_plan(data: NestingRequest) -> NestingPlan:
-        return service.nesting(data)
+        return service.nesting(resolved_nesting(data))
 
     @router.post("/nesting/preview.svg")
     def nesting_preview(data: NestingRequest) -> Response:
-        plan = service.nesting(data)
+        plan = service.nesting(resolved_nesting(data))
         sheet = plan.selected_sheet
         colors = ["#41b9f4", "#58c98d", "#f0ad4e", "#8d7bd8", "#e56b7f", "#56b4aa"]
         codes = {code: colors[index % len(colors)] for index, code in enumerate(sorted({item.code for item in plan.placements}))}

@@ -68,3 +68,24 @@ def test_dxf_batch_becomes_priced_quote_item_drafts() -> None:
     assert drafts[0]["cut_length_mm"] == 300
     assert drafts[0]["processes"][0]["name"] == "Corte Laser"
     assert drafts[0]["processes"][0]["minutes"] > 0
+
+
+def test_nesting_uses_administrative_defaults_when_parameters_are_omitted(tmp_path) -> None:
+    client = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
+    settings = client.get("/api/v1/commercial/settings/costs").json()
+    settings.update({
+        "default_sheet_width_mm": 1000,
+        "default_sheet_length_mm": 2000,
+        "alternative_sheet_width_mm": 1400,
+        "alternative_sheet_length_mm": 2500,
+        "default_nesting_gap_mm": 7,
+        "sheet_edge_margin_mm": 15,
+        "alternative_minimum_gain_percent": 9,
+    })
+    client.put("/api/v1/commercial/settings/costs", json=settings)
+    response = client.post("/api/v1/engineering/nesting/plan", json={
+        "parts": [{"code": "P1", "width_mm": 100, "height_mm": 100}],
+    })
+    assert response.status_code == 200
+    widths = [item["sheet"]["width_mm"] for item in response.json()["comparison"]]
+    assert widths == [1000, 1400]

@@ -10,6 +10,9 @@ const money = value => Number(value || 0).toLocaleString("pt-BR", {
 let pendingQuoteItems = [];
 let lastDxfDrafts = [];
 let quoteMaterialCatalog = [];
+let routingTemplates = [];
+let editingQuoteItemIndex = null;
+let currentUser = null;
 
 function requirePasswordChange(user) {
   if (user.must_change_password && !$("#password-dialog").open) $("#password-dialog").showModal();
@@ -201,6 +204,35 @@ window.resolveQuality = async id => {
 
 async function maintenance() {
   const data = await req("/maintenance");
+  const settingsCard = $("#cost-settings-card");
+  settingsCard.hidden = currentUser?.role !== "administrador";
+  $("#routing-settings-card").hidden = currentUser?.role !== "administrador";
+  if (currentUser?.role === "administrador") {
+    const form = $("#cost-settings-form");
+    const nestingFields = [
+      ["default_nesting_gap_mm", "Folga padrão nesting (mm)"],
+      ["alternative_sheet_width_mm", "Largura chapa alternativa (mm)"],
+      ["alternative_sheet_length_mm", "Comprimento chapa alternativa (mm)"],
+      ["alternative_minimum_gain_percent", "Ganho mínimo alternativa (%)"],
+    ];
+    const action = form.querySelector(".wide");
+    nestingFields.forEach(([name, label]) => {
+      if (form.elements[name]) return;
+      const field = document.createElement("label");
+      field.textContent = label;
+      field.innerHTML += `<input name="${name}" type="number" min="0" step=".1">`;
+      form.insertBefore(field, action);
+    });
+    const settings = await req("/commercial/settings/costs");
+    Object.entries(settings).forEach(([name, value]) => {
+      if (form.elements[name] && typeof value !== "object") form.elements[name].value = value;
+    });
+    routingTemplates = await req("/catalogs/routing-templates");
+    $("#routing-template-table").innerHTML = table(
+      ["Roteiro", "Sequência", "Status"],
+      routingTemplates.map(item => `<tr><td><b>${esc(item.name)}</b><br><small>${esc(item.description)}</small></td><td>${item.steps.map(step => `${step.operation_erp_code} · ${esc(step.process)} (${step.default_minutes} min)`).join(" → ")}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`)
+    );
+  }
   $("#maintenance-table").innerHTML = table(
     ["Ordem","Equipamento","Tipo","Data","Responsável","Status"],
     data.map(item => `<tr><td><b>${esc(item.number)}</b></td><td>${esc(item.equipment)}</td><td>${esc(item.type)}</td><td>${item.scheduled_date || "—"}</td><td>${esc(item.responsible || "—")}</td><td>${pill(item.status)}</td></tr>`)
@@ -314,7 +346,7 @@ $("#nesting-form").onsubmit = async event => {
       if (!code || !Number(width) || !Number(height) || !Number(quantity)) throw Error(`Linha ${index + 1} inválida.`);
       return {code, width_mm:Number(width), height_mm:Number(height), quantity:Number(quantity), allow_rotation:true};
     });
-    const payload = {parts, gap_mm:Number(values.gap_mm), edge_margin_mm:Number(values.edge_margin_mm), alternative_minimum_gain_percent:Number(values.alternative_minimum_gain_percent)};
+    const payload = {parts};
     const plan = await req("/engineering/nesting/plan", {method:"POST", body:JSON.stringify(payload)});
     const previewResponse = await fetch(api + "/engineering/nesting/preview.svg", {method:"POST", credentials:"same-origin", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
     if (!previewResponse.ok) throw Error("Não foi possível gerar a prévia do nesting.");
@@ -335,13 +367,19 @@ $("#client-form").onsubmit = async event => {
 
 $("#new-quote").addEventListener("click", async () => {
   pendingQuoteItems = [];
+  editingQuoteItemIndex = null;
   renderPendingQuoteItems();
-  const [clients, materials] = await Promise.all([req("/commercial/clients"), req("/catalogs/materials?active=true")]);
+  const [clients, materials, templates] = await Promise.all([
+    req("/commercial/clients"), req("/catalogs/quote-materials"),
+    req("/catalogs/quote-routing-templates")
+  ]);
   quoteMaterialCatalog = materials;
-  $("#quote-material-options").innerHTML = materials.map(item => `<option value="${esc(item.description)}">${esc(item.erp_code)} · ${item.thickness_mm} mm · ${money(item.price_per_kg)}</option>`).join("");
+  routingTemplates = templates;
+  $("#quote-material-options").innerHTML = materials.map(item => `<option value="${esc(item.description)}">${esc(item.erp_code)} · ${item.thickness_mm} mm</option>`).join("");
   $("#quote-client").innerHTML = clients.map(client =>
     `<option value="${client.id}">${esc(client.name)}</option>`
   ).join("");
+  $("#quote-routing-template").innerHTML = '<option value="">Selecionar roteiro…</option>' + templates.map(template => `<option value="${template.id}">${esc(template.name)}</option>`).join("");
   const validity = new Date(); validity.setDate(validity.getDate() + 10);
   $("#quote-form [name=valid_until]").value = validity.toISOString().slice(0,10);
 });
@@ -350,23 +388,29 @@ $("#quote-form [name=item_material]").addEventListener("change", event => {
   const selected = quoteMaterialCatalog.find(item => item.description.toLocaleLowerCase("pt-BR") === event.target.value.toLocaleLowerCase("pt-BR"));
   if (!selected) return;
   $("#quote-form [name=item_thickness]").value = selected.thickness_mm;
-  $("#quote-form [name=item_material_price]").value = selected.price_per_kg;
 });
 
 function quoteItemFromForm(form) {
-  const processes = [];
-  if (Number(form.cut_minutes)) processes.push({name:"Corte laser", minutes:Number(form.cut_minutes), hourly_rate:Number(form.cut_rate), external_cost:0});
-  if (Number(form.bend_minutes)) processes.push({name:"Dobra", minutes:Number(form.bend_minutes), hourly_rate:Number(form.bend_rate), external_cost:0});
-  if (Number(form.roll_value)) processes.push(form.roll_pricing_mode === "peso"
-    ? {name:"Calandra", minutes:0, hourly_rate:0, pricing_mode:"peso", weight_rate:Number(form.roll_value), external_cost:0}
-    : {name:"Calandra", minutes:Number(form.roll_value), hourly_rate:150, pricing_mode:"tempo", external_cost:0});
+  const template = routingTemplates.find(item => item.id === form.routing_template_id);
+  const processes = (template?.steps || []).map((step, index) => ({
+    name:step.process,
+    minutes:Number(form[`process_minutes_${index}`] || step.default_minutes),
+    hourly_rate:0,
+    external_cost:0
+  }));
   return {
     code:form.item_code, description:form.item_description,
     quantity:Number(form.item_quantity), material:form.item_material,
     thickness_mm:form.item_thickness ? Number(form.item_thickness) : null,
-    net_weight_kg:Number(form.item_weight), material_price_kg:Number(form.item_material_price),
-    utilization_percent:Number(form.item_utilization), margin_percent:Number(form.item_margin_percent),
-    notes:form.item_notes, processes
+    width_mm:form.item_width ? Number(form.item_width) : null,
+    length_mm:form.item_length ? Number(form.item_length) : null,
+    net_weight_kg:Number(form.item_weight),
+    nesting_mode:form.nesting_mode,
+    utilization_percent:form.nesting_mode === "forcar_ncav" && form.item_utilization ? Number(form.item_utilization) : undefined,
+    margin_percent:Number(form.item_margin_percent),
+    notes:form.item_notes, processes,
+    routing_template_id:form.routing_template_id || null,
+    routing_template_name:template?.name || "Sem roteiro"
   };
 }
 
@@ -378,14 +422,56 @@ async function engineering() {
 }
 
 function renderPendingQuoteItems() {
-  $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) =>
-    `<div class="pending-item"><span><b>${esc(item.code)}</b> · ${esc(item.description)} · ${item.quantity} un</span><button type="button" data-remove-item="${index}">Remover</button></div>`
-  ).join("");
+  $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) => `<tr><td>${index + 1}</td><td><b>${esc(item.code)}</b><br><small>${esc(item.description)}</small></td><td>${esc(item.material || "—")}${item.thickness_mm ? `<br><small>${item.thickness_mm} mm</small>` : ""}</td><td>${item.quantity}</td><td>${item.margin_percent ?? 30}%</td><td>${item.nesting_mode === "forcar_ncav" ? `NcAv ${item.utilization_percent || "auto"}%` : esc(item.nesting_mode || "automático")}</td><td>${esc(item.routing_template_name || "Sem roteiro")}<br><small>${(item.processes || []).map(process => `${esc(process.name)} ${process.minutes} min`).join(" · ")}</small></td><td class="quote-row-actions"><button type="button" data-edit-item="${index}">Editar</button><button type="button" data-remove-item="${index}">Excluir</button></td></tr>`).join("");
+  const quantity = pendingQuoteItems.reduce((sum, item) => sum + Number(item.quantity), 0);
+  $("#quote-item-count").textContent = pendingQuoteItems.length;
+  $("#quote-summary-count").textContent = pendingQuoteItems.length;
+  $("#quote-summary-quantity").textContent = quantity.toLocaleString("pt-BR");
+  $("#quote-summary-delivery").textContent = $("#quote-form [name=expected_delivery]").value || "—";
   document.querySelectorAll("[data-remove-item]").forEach(button => button.onclick = () => {
     pendingQuoteItems.splice(Number(button.dataset.removeItem), 1);
+    resetQuoteItemEditor();
     renderPendingQuoteItems();
   });
+  document.querySelectorAll("[data-edit-item]").forEach(button => button.onclick = () => editQuoteItem(Number(button.dataset.editItem)));
 }
+
+function renderProcessTimes(templateId, values = []) {
+  const template = routingTemplates.find(item => item.id === templateId);
+  $("#quote-process-times").innerHTML = template ? `<div class="process-time-grid">${template.steps.map((step, index) => `<label>${step.operation_erp_code} · ${esc(step.process)} (min)<input name="process_minutes_${index}" type="number" min="0" step=".1" value="${values[index]?.minutes ?? step.default_minutes}"></label>`).join("")}</div>` : '<small class="muted">Selecione um roteiro para informar os tempos de processo.</small>';
+}
+
+function resetQuoteItemEditor() {
+  editingQuoteItemIndex = null;
+  $("#item-editor-title").textContent = "Adicionar item";
+  $("#add-quote-item").textContent = "Adicionar item";
+  $("#cancel-item-edit").classList.add("hidden");
+  ["item_code","item_description","item_material","item_thickness","item_weight","item_width","item_length","item_notes","item_utilization"].forEach(name => $("#quote-form [name=" + name + "]").value = "");
+  $("#quote-form [name=item_quantity]").value = 1;
+  $("#quote-form [name=item_margin_percent]").value = 30;
+  $("#quote-form [name=nesting_mode]").value = "automatico";
+  $("#quote-form [name=routing_template_id]").value = "";
+  $(".ncav-field").classList.add("hidden");
+  renderProcessTimes("");
+}
+
+function editQuoteItem(index) {
+  const item = pendingQuoteItems[index];
+  editingQuoteItemIndex = index;
+  const form = $("#quote-form");
+  const values = {item_code:item.code,item_description:item.description,item_quantity:item.quantity,item_material:item.material,item_thickness:item.thickness_mm,item_weight:item.net_weight_kg,item_width:item.width_mm,item_length:item.length_mm,item_margin_percent:item.margin_percent,item_utilization:item.utilization_percent,item_notes:item.notes,nesting_mode:item.nesting_mode,routing_template_id:item.routing_template_id};
+  Object.entries(values).forEach(([name, value]) => { if (form.elements[name]) form.elements[name].value = value ?? ""; });
+  $("#item-editor-title").textContent = `Editar item ${index + 1}`;
+  $("#add-quote-item").textContent = "Atualizar item";
+  $("#cancel-item-edit").classList.remove("hidden");
+  $(".ncav-field").classList.toggle("hidden", item.nesting_mode !== "forcar_ncav");
+  renderProcessTimes(item.routing_template_id, item.processes);
+}
+
+$("#quote-routing-template").onchange = event => renderProcessTimes(event.target.value);
+$("#quote-nesting-mode").onchange = event => $(".ncav-field").classList.toggle("hidden", event.target.value !== "forcar_ncav");
+$("#quote-form [name=expected_delivery]").onchange = renderPendingQuoteItems;
+$("#cancel-item-edit").onclick = resetQuoteItemEditor;
 
 $("#add-quote-item").onclick = () => {
   const form = Object.fromEntries(new FormData($("#quote-form")));
@@ -393,17 +479,18 @@ $("#add-quote-item").onclick = () => {
     $("#quote-form .dialog-error").textContent = "Preencha código, descrição e quantidade do item.";
     return;
   }
-  pendingQuoteItems.push(quoteItemFromForm(form));
+  const item = quoteItemFromForm(form);
+  if (editingQuoteItemIndex === null) pendingQuoteItems.push(item);
+  else pendingQuoteItems[editingQuoteItemIndex] = item;
   renderPendingQuoteItems();
-  ["item_code","item_description","item_material","item_thickness","item_notes"].forEach(name => $("#quote-form [name=" + name + "]").value = "");
+  resetQuoteItemEditor();
   $("#quote-form .dialog-error").textContent = "";
 };
 
 $("#quote-form").onsubmit = async event => {
   event.preventDefault();
   const form = Object.fromEntries(new FormData(event.target));
-  const currentItem = form.item_code && form.item_description ? quoteItemFromForm(form) : null;
-  const items = [...pendingQuoteItems, ...(currentItem ? [currentItem] : [])];
+  const items = [...pendingQuoteItems];
   if (!items.length) {
     event.target.querySelector(".dialog-error").textContent = "Adicione pelo menos um item à proposta.";
     return;
@@ -413,9 +500,6 @@ $("#quote-form").onsubmit = async event => {
     prepared_by:form.prepared_by,
     valid_until:form.valid_until, expected_delivery:form.expected_delivery || null,
     payment_terms:form.payment_terms, freight_type:form.freight_type,
-    nature_operation:form.nature_operation, tax_scenario:form.tax_scenario,
-    margin_percent:Number(form.margin_percent), ipi_percent:Number(form.ipi_percent),
-    cbs_percent:Number(form.cbs_percent), ibs_percent:Number(form.ibs_percent),
     discount_value:Number(form.discount_value), observations:form.observations,
     items
   };
@@ -439,6 +523,32 @@ $("#maintenance-form").onsubmit = async event => {
   if (!data.scheduled_date) delete data.scheduled_date;
   await req("/maintenance", {method:"POST", body:JSON.stringify(data)});
   $("#maintenance-dialog").close(); event.target.reset(); await maintenance();
+};
+
+$("#routing-template-form").onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  try {
+    const steps = values.steps.split(/\r?\n/).filter(Boolean).map((line, index) => {
+      const [code, process, minutes] = line.split(";").map(value => value.trim());
+      if (!Number(code) || !process || Number.isNaN(Number(minutes))) throw Error(`Etapa ${index + 1} inválida.`);
+      return {operation_erp_code:Number(code), process, default_minutes:Number(minutes)};
+    });
+    await req("/catalogs/routing-templates", {method:"POST", body:JSON.stringify({
+      name:values.name, description:values.description, steps, active:true
+    })});
+    event.target.reset();
+    await maintenance();
+  } catch (error) { alert(error.message); }
+};
+
+$("#cost-settings-form").onsubmit = async event => {
+  event.preventDefault();
+  const current = await req("/commercial/settings/costs");
+  const values = Object.fromEntries(new FormData(event.target));
+  Object.entries(values).forEach(([key, value]) => current[key] = Number(value));
+  await req("/commercial/settings/costs", {method:"PUT", body:JSON.stringify(current)});
+  $("#cost-settings-status").textContent = "Parâmetros salvos.";
 };
 
 $("#work-log-form").onsubmit = async event => {
@@ -478,6 +588,7 @@ $("#login-form").onsubmit = async event => {
   const data = Object.fromEntries(new FormData(event.target));
   try {
     const login = await req("/auth/login", {method:"POST", body:JSON.stringify(data)});
+    currentUser = login.user;
     $("#login-screen").classList.add("hidden");
     $("#status").textContent = `● ${login.user.name}`;
     if (requirePasswordChange(login.user)) return;
@@ -502,6 +613,7 @@ $("#password-form").onsubmit = async event => {
 (async () => {
   try {
     const user = await req("/auth/me");
+    currentUser = user;
     $("#login-screen").classList.add("hidden");
     $("#status").textContent = `● ${user.name}`;
     if (requirePasswordChange(user)) return;

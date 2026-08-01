@@ -6,7 +6,7 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.3.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.4.0`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
@@ -16,6 +16,14 @@ controle de acesso por perfil e API integrada.
 
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
+
+## Versão 1.4.0 — Orçamento denso e Manutenções administrativas
+
+- tabela compacta para propostas com 20 itens ou mais;
+- margem por item, NcAv condicional e prazo único de entrega;
+- roteiros padrão com processos e tempos ajustáveis;
+- catálogos comerciais sanitizados, sem exposição de preços e custos internos;
+- parâmetros de custeio e nesting centralizados para o administrador.
 
 ## Versão 1.3.0 — Consolidação por fases
 

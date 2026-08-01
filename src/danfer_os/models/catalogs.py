@@ -35,6 +35,16 @@ class Material(MaterialCreate):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class QuoteMaterialOption(BaseModel):
+    """Projeção comercial sem preço, densidade ou outros dados de custo."""
+
+    id: UUID
+    erp_code: str
+    description: str
+    specification: str = ""
+    thickness_mm: float
+
+
 class OperationUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=80)
     pricing_mode: OperationPricingMode | None = None
@@ -52,4 +62,29 @@ class Operation(BaseModel):
     weight_rate: float = Field(default=0, ge=0)
     fixed_cost: float = Field(default=0, ge=0)
     active: bool = True
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RoutingTemplateStep(BaseModel):
+    operation_erp_code: int = Field(gt=0)
+    process: str = Field(min_length=2, max_length=80)
+    default_minutes: float = Field(default=0, ge=0)
+
+
+class RoutingTemplateCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+    description: str = Field(default="", max_length=240)
+    steps: list[RoutingTemplateStep] = Field(min_length=1, max_length=20)
+    active: bool = True
+
+
+class RoutingTemplateUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=100)
+    description: str | None = Field(default=None, max_length=240)
+    steps: list[RoutingTemplateStep] | None = Field(default=None, min_length=1, max_length=20)
+    active: bool | None = None
+
+
+class RoutingTemplate(RoutingTemplateCreate):
+    id: UUID = Field(default_factory=uuid4)
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

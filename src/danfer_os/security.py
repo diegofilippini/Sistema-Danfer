@@ -28,6 +28,17 @@ ROLE_PREFIXES = {
     "/api/v1/audit": {UserRole.ADMIN},
 }
 
+# Parâmetros de formação de preço pertencem à administração. A rota histórica é
+# mantida para integrações existentes, mas não herda a permissão ampla do módulo
+# comercial.
+ADMIN_ONLY_PATHS = {"/api/v1/commercial/settings/costs"}
+SENSITIVE_CATALOG_PREFIXES = {
+    "/api/v1/catalogs/materials",
+    "/api/v1/catalogs/operations",
+    "/api/v1/catalogs/routing-templates",
+}
+ENGINEERING_ONLY_PREFIXES = {"/api/v1/engineering/nesting"}
+
 
 def security_middleware(auth: AuthService):
     async def middleware(
@@ -48,10 +59,15 @@ def security_middleware(auth: AuthService):
                 {"detail": "troca de senha obrigatória antes de continuar"},
                 status_code=428,
             )
-        allowed = next(
-            (roles for prefix, roles in ROLE_PREFIXES.items() if path.startswith(prefix)),
-            None,
-        )
+        if path in ADMIN_ONLY_PATHS:
+            allowed = {UserRole.ADMIN}
+        elif any(path.startswith(prefix) for prefix in (*SENSITIVE_CATALOG_PREFIXES, *ENGINEERING_ONLY_PREFIXES)):
+            allowed = {UserRole.ADMIN, UserRole.ENGINEERING}
+        else:
+            allowed = next(
+                (roles for prefix, roles in ROLE_PREFIXES.items() if path.startswith(prefix)),
+                None,
+            )
         if allowed and user.role not in allowed:
             return JSONResponse({"detail": "acesso não autorizado para este perfil"}, status_code=403)
         request.state.user = user

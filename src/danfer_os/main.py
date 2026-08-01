@@ -43,7 +43,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="1.3.0",
+        version="1.4.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -64,9 +64,9 @@ def create_app(
     integration_service = IntegrationService(
         library, None if isolated_test_mode else data_dir / "integrations.json"
     )
-    commercial_service = CommercialService(data_dir / "commercial.json")
     operations_service = OperationsService(data_dir / "operations.json")
     catalog_service = CatalogService(data_dir / "catalogs.json")
+    commercial_service = CommercialService(data_dir / "commercial.json", catalog_service)
     if os.getenv("DANFER_SEED_DEMO") == "1":
         seed_demo(
             library,
@@ -118,7 +118,7 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        create_engineering_router(EngineeringService(), library),
+        create_engineering_router(EngineeringService(), library, commercial_service),
         prefix="/api/v1",
     )
     app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")

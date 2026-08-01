@@ -21,6 +21,7 @@ from danfer_os.models.commercial import (
     QuoteStatus,
     QuoteUpdate,
 )
+from danfer_os.services.catalogs import CatalogService
 
 
 class CommercialNotFoundError(LookupError):
@@ -45,8 +46,9 @@ class CommercialService:
     def _money(value: float) -> float:
         return float(Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
-    def __init__(self, storage_path: Path | None = None) -> None:
+    def __init__(self, storage_path: Path | None = None, catalog_service: CatalogService | None = None) -> None:
         self._storage_path = storage_path
+        self._catalog_service = catalog_service
         self._clients: dict[UUID, Client] = {}
         self._quotes: dict[UUID, Quote] = {}
         self._revisions: dict[UUID, list[QuoteRevision]] = {}
@@ -152,7 +154,12 @@ class CommercialService:
         quote_type: str,
         compatible_item_count: int,
     ) -> QuoteItem:
-        utilization = max(data.utilization_percent, 1)
+        utilization = max(
+            data.utilization_percent
+            if data.utilization_percent is not None
+            else self._settings.default_item_utilization_percent,
+            1,
+        )
         selected_width = selected_length = None
         applied_gap = 0.0
         costing_method = "aproveitamento_informado"
@@ -218,25 +225,43 @@ class CommercialService:
             warnings.append(self._settings.inox_warning)
         large_part_loss = (
             data.quantity == 1
-            and data.utilization_percent > self._settings.large_part_threshold_percent
+            and utilization > self._settings.large_part_threshold_percent
             and compatible_item_count == 1
             and quote_type == "venda"
         )
         if large_part_loss:
             material_consumption *= 1 + self._settings.large_part_loss_percent / 100
+        material_price = data.material_price_kg
+        if material_price is None and self._catalog_service is not None:
+            candidates = self._catalog_service.list_materials(data.material, True)
+            selected = next((item for item in candidates if (
+                item.description.casefold() == data.material.casefold()
+                and (data.thickness_mm is None or item.thickness_mm == data.thickness_mm)
+            )), None)
+            material_price = selected.price_per_kg if selected else 0
+        material_price = material_price or 0
         material_cost = (
             0
             if quote_type == "servico"
-            else material_consumption * data.material_price_kg
+            else material_consumption * material_price
         )
         process_cost = 0.0
         for process in data.processes:
+            hourly_rate = process.hourly_rate
+            if not hourly_rate:
+                process_name = process.name.casefold()
+                if "corte" in process_name or "laser" in process_name:
+                    hourly_rate = self._settings.default_cut_hourly_rate
+                elif "dobra" in process_name:
+                    hourly_rate = self._settings.default_bend_hourly_rate
+                elif "calandra" in process_name:
+                    hourly_rate = self._settings.default_roll_hourly_rate
             if process.pricing_mode.value == "peso":
                 cost = data.net_weight_kg * process.weight_rate
             elif process.pricing_mode.value == "fixo":
                 cost = process.fixed_cost
             else:
-                cost = process.minutes / 60 * process.hourly_rate
+                cost = process.minutes / 60 * hourly_rate
             cost += process.external_cost
             if (
                 "dobra" in process.name.casefold()
@@ -258,7 +283,9 @@ class CommercialService:
         )
         rounded_unit_price = self._money(unit_price)
         return QuoteItem(
-            **data.model_dump(),
+            **data.model_dump(exclude={"utilization_percent", "material_price_kg"}),
+            utilization_percent=utilization,
+            material_price_kg=material_price,
             material_cost=self._money(material_cost),
             process_cost=self._money(process_cost),
             indirect_cost=self._money(indirect),
@@ -306,6 +333,20 @@ class CommercialService:
 
     def create_quote(self, data: QuoteCreate) -> Quote:
         self.get_client(data.client_id)
+        # Valores zero/default enviados por clientes antigos continuam válidos.
+        # A interface simplificada envia os campos administrativos como nulos e
+        # eles são resolvidos aqui, sem expor a configuração ao orçamentista.
+        updates = {}
+        if data.margin_percent is None:
+            updates["margin_percent"] = self._settings.default_margin_percent
+        if data.ipi_percent is None:
+            updates["ipi_percent"] = self._settings.default_ipi_percent
+        if data.cbs_percent is None:
+            updates["cbs_percent"] = self._settings.default_cbs_percent
+        if data.ibs_percent is None:
+            updates["ibs_percent"] = self._settings.default_ibs_percent
+        if updates:
+            data = data.model_copy(update=updates)
         self._quote_sequence += 1
         number = f"ORC-{datetime.now():%Y}-{self._quote_sequence:05d}"
         quote = self._calculate_quote(data, number)

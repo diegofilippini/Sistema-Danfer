@@ -52,13 +52,10 @@ class NestingSheet(BaseModel):
 
 class NestingRequest(BaseModel):
     parts: list[NestingPart] = Field(min_length=1, max_length=200)
-    sheets: list[NestingSheet] = Field(default_factory=lambda: [
-        NestingSheet(name="Padrão 1200 × 3000", width_mm=1200, length_mm=3000),
-        NestingSheet(name="Alternativa 1500 × 3000", width_mm=1500, length_mm=3000),
-    ], min_length=1, max_length=10)
-    gap_mm: float = Field(default=5, ge=0, le=100)
-    edge_margin_mm: float = Field(default=10, ge=0, le=200)
-    alternative_minimum_gain_percent: float = Field(default=8, ge=0, le=100)
+    sheets: list[NestingSheet] | None = Field(default=None, max_length=10)
+    gap_mm: float | None = Field(default=None, ge=0, le=100)
+    edge_margin_mm: float | None = Field(default=None, ge=0, le=200)
+    alternative_minimum_gain_percent: float | None = Field(default=None, ge=0, le=100)
 
     @model_validator(mode="after")
     def limit_expanded_parts(self) -> "NestingRequest":
