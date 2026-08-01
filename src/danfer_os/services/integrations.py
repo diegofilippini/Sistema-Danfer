@@ -15,6 +15,7 @@ from danfer_os.models.integrations import (
     ImportStatus,
 )
 from danfer_os.services.technical_library import TechnicalLibrary
+from danfer_os.models.commercial import Client, Quote
 
 
 class IntegrationValidationError(ValueError):
@@ -127,6 +128,33 @@ class IntegrationService:
         if status:
             events = (event for event in events if event.status == status)
         return [event.model_copy(deep=True) for event in events]
+
+    def queue_quote(self, quote: Quote, client: Client) -> ErpEvent:
+        existing = next((event for event in self._erp_events.values()
+                         if event.entity == "orcamento" and event.entity_id == quote.id and event.action == "criar_pedido"), None)
+        if existing:
+            return existing.model_copy(deep=True)
+        event = ErpEvent(
+            entity="orcamento", entity_id=quote.id, action="criar_pedido",
+            company_unit=quote.billing_unit,
+            payload={
+                "quote_number": quote.number, "revision": quote.revision,
+                "customer": client.name, "customer_document": client.document,
+                "nature_operation": quote.nature_operation,
+                "payment_terms": quote.payment_terms or client.payment_terms,
+                "freight_type": quote.freight_type.value,
+                "total": quote.total,
+                "items": [{
+                    "code": item.code, "description": item.description,
+                    "quantity": item.quantity, "unit": item.unit,
+                    "unit_price": item.unit_price, "total_price": item.total_price,
+                    "material": item.material, "thickness_mm": item.thickness_mm,
+                } for item in quote.items],
+            },
+        )
+        self._erp_events[event.id] = event
+        self._save()
+        return event.model_copy(deep=True)
 
     def acknowledge_event(self, event_id: UUID, succeeded: bool, error: str = "") -> ErpEvent:
         current = self._erp_events.get(event_id)

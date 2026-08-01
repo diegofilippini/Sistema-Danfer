@@ -24,6 +24,7 @@ ROLE_PREFIXES = {
     "/api/v1/billing": {UserRole.ADMIN, UserRole.COMMERCIAL},
     "/api/v1/requests": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP, UserRole.ENGINEERING, UserRole.PRODUCTION, UserRole.QUALITY},
     "/api/v1/communications": {UserRole.ADMIN, UserRole.COMMERCIAL},
+    "/api/v1/workflows": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP},
     "/api/v1/audit": {UserRole.ADMIN},
 }
 

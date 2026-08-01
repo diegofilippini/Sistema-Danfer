@@ -137,6 +137,12 @@ class PcpService:
             raise ProductionOrderNotFoundError(order_id)
         return order.model_copy(deep=True)
 
+    def find_by_number(self, number: str) -> ProductionOrder:
+        order = next((item for item in self._orders.values() if item.number.casefold() == number.casefold()), None)
+        if order is None:
+            raise ProductionOrderNotFoundError(number)
+        return order.model_copy(deep=True)
+
     def update(self, order_id: UUID, data: ProductionOrderUpdate) -> ProductionOrder:
         current = self.get(order_id)
         changes = data.model_dump(exclude_unset=True)

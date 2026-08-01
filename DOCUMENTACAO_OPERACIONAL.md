@@ -1,4 +1,4 @@
-# Danfer Industrial OS 1.1.0 — Guia operacional
+# Danfer Industrial OS 1.2.0 — Guia operacional
 
 ## Inicialização e acesso
 
@@ -16,8 +16,13 @@ troque a senha após o primeiro acesso.
 6. Consulte carga e capacidade no **PCP diário**, ajustando exceções do calendário pela API quando necessário.
 7. Registre apontamentos de operação, material, terceiro e qualidade na OP.
 8. Acompanhe a comparação de custo estimado versus realizado.
-9. Use a Central de Solicitações para demandas entre Comercial, PCP e Engenharia.
+9. Use a Central de Solicitações para demandas entre Comercial, PCP e Engenharia, registrando responsável e previsão prometida.
 10. Prepare mensagens; o sistema gera o link de WhatsApp/e-mail, mas não envia sem ação do usuário.
+
+Ao aprovar um orçamento pela interface, o sistema cria de forma idempotente um
+evento de pedido na fila ERP. A geração da OP leva os custos estimados do item;
+ocorrências de qualidade vinculadas ao número da OP entram automaticamente no
+custo real.
 
 ## Orçamentos e propostas
 

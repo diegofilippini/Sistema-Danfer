@@ -13,14 +13,28 @@ from danfer_os.models.operations import (
     QualityOccurrenceCreate,
 )
 from danfer_os.services.operations import OperationsNotFoundError, OperationsService
+from danfer_os.models.pcp import WorkLogCreate, WorkLogType
+from danfer_os.services.pcp import PcpService, ProductionOrderNotFoundError
 
 
-def create_router(service: OperationsService) -> APIRouter:
+def create_router(service: OperationsService, pcp: PcpService | None = None) -> APIRouter:
     router = APIRouter(tags=["operações"])
 
     @router.post("/quality", response_model=QualityOccurrence, status_code=201)
     def create_quality(data: QualityOccurrenceCreate) -> QualityOccurrence:
-        return service.create_quality(data)
+        order = None
+        if data.production_order and pcp:
+            try:
+                order = pcp.find_by_number(data.production_order)
+            except ProductionOrderNotFoundError as error:
+                raise HTTPException(status_code=422, detail="ordem de produção não encontrada") from error
+        occurrence = service.create_quality(data)
+        if order and data.cost:
+            pcp.add_log(order.id, WorkLogCreate(
+                type=WorkLogType.QUALITY, amount=data.cost,
+                notes=f"{data.type.value}: {data.description}",
+            ))
+        return occurrence
 
     @router.get("/quality", response_model=list[QualityOccurrence])
     def list_quality(resolved: bool | None = None) -> list[QualityOccurrence]:
@@ -59,8 +73,8 @@ def create_router(service: OperationsService) -> APIRouter:
         return service.create_notification(data)
 
     @router.get("/notifications", response_model=list[Notification])
-    def notifications() -> list[Notification]:
-        return service.notifications()
+    def notifications(username: str = "", role: str = "") -> list[Notification]:
+        return service.notifications(username, role)
 
     @router.post("/notifications/{notification_id}/read", response_model=Notification)
     def read_notification(notification_id: UUID) -> Notification:

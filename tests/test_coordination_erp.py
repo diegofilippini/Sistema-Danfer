@@ -25,9 +25,11 @@ def test_billing_requests_and_whatsapp_draft_are_persistent(tmp_path: Path) -> N
     assert request.json()["number"].startswith("SOL-")
     moved = client.post(f"/api/v1/requests/{request.json()['id']}/status", json={
         "status": "em_atendimento", "assigned_to": "Engenharia",
+        "promised_date": "2026-08-15",
         "comment": {"author": "Diego", "message": "Análise iniciada"},
     })
     assert moved.json()["comments"][0]["message"] == "Análise iniciada"
+    assert moved.json()["promised_date"] == "2026-08-15"
 
     message = client.post("/api/v1/communications/messages", json={
         "company_unit": "df", "channel": "whatsapp", "recipient": "+55 (11) 99999-1234",

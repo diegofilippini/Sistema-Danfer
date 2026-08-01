@@ -45,3 +45,12 @@ def test_auth_quality_maintenance_and_audit(tmp_path: Path) -> None:
     )
     assert completed.json()["actual_cost"] == 320
     assert len(client.get("/api/v1/audit").json()) >= 4
+
+    client.post("/api/v1/notifications", json={
+        "title": "PCP", "message": "Programação liberada", "recipient_role": "pcp",
+    })
+    client.post("/api/v1/notifications", json={
+        "title": "Comercial", "message": "Proposta aprovada", "recipient_username": "vendas",
+    })
+    assert len(client.get("/api/v1/notifications", params={"role": "pcp"}).json()) == 1
+    assert len(client.get("/api/v1/notifications", params={"username": "vendas"}).json()) == 1

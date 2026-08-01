@@ -43,7 +43,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="1.1.0",
+        version="1.2.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -99,7 +99,7 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        create_operations_router(operations_service),
+        create_operations_router(operations_service, pcp_service),
         prefix="/api/v1",
     )
     app.include_router(
@@ -113,6 +113,7 @@ def create_app(
             library,
             bom_service,
             pcp_service,
+            integration_service,
         ),
         prefix="/api/v1",
     )

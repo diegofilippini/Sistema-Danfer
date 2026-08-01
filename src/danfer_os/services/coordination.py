@@ -82,6 +82,7 @@ class CoordinationService:
         updated = current.model_copy(update={
             "status": data.status,
             "assigned_to": data.assigned_to if data.assigned_to is not None else current.assigned_to,
+            "promised_date": data.promised_date if data.promised_date is not None else current.promised_date,
             "comments": comments, "updated_at": datetime.now(timezone.utc),
         })
         self._requests[request_id] = updated

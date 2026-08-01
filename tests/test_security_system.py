@@ -10,7 +10,7 @@ def test_auth_enforcement_roles_password_and_backup(tmp_path: Path) -> None:
     assert client.get("/api/v1/commercial/clients").status_code == 401
     login = client.post("/api/v1/auth/login", json={"username": "admin", "password": "Danfer@2026"})
     assert login.status_code == 200
-    assert client.get("/api/v1/system/version").json() == {"version": "1.1.0", "data_schema": "2"}
+    assert client.get("/api/v1/system/version").json() == {"version": "1.2.0", "data_schema": "2"}
     backup = client.get("/api/v1/system/backup")
     assert backup.status_code == 200
     assert backup.content.startswith(b"PK")

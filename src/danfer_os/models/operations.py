@@ -81,6 +81,8 @@ class NotificationCreate(BaseModel):
     title: str = Field(min_length=2, max_length=160)
     message: str = Field(min_length=2, max_length=1000)
     audience: str = Field(default="todos", max_length=80)
+    recipient_username: str = Field(default="", max_length=50)
+    recipient_role: str = Field(default="", max_length=40)
 
 
 class Notification(NotificationCreate):

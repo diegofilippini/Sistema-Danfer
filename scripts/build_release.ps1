@@ -1,12 +1,12 @@
 param(
-    [string]$Destination = "..\outputs\Sistema-Danfer-Industrial-OS-1.1.0.zip"
+    [string]$Destination = "..\outputs\Sistema-Danfer-Industrial-OS-1.2.0.zip"
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $destinationPath = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $Destination))
 $stagingRoot = Join-Path $projectRoot "work\release-staging"
-$packageRoot = Join-Path $stagingRoot "Sistema-Danfer-Industrial-OS-1.1.0"
+$packageRoot = Join-Path $stagingRoot "Sistema-Danfer-Industrial-OS-1.2.0"
 
 if (Test-Path -LiteralPath $stagingRoot) {
     Remove-Item -LiteralPath $stagingRoot -Recurse -Force

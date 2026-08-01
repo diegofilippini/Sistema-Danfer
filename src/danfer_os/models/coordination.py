@@ -61,6 +61,7 @@ class ServiceRequest(ServiceRequestCreate):
     number: str
     status: RequestStatus = RequestStatus.OPEN
     assigned_to: str = ""
+    promised_date: date | None = None
     comments: list[RequestComment] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -69,6 +70,7 @@ class ServiceRequest(ServiceRequestCreate):
 class RequestStatusChange(BaseModel):
     status: RequestStatus
     assigned_to: str | None = Field(default=None, max_length=120)
+    promised_date: date | None = None
     comment: RequestComment | None = None
 
 

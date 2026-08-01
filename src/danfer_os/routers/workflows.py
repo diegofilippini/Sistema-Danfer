@@ -9,6 +9,8 @@ from danfer_os.services.bom import BomNotFoundError, BomService
 from danfer_os.services.commercial import CommercialNotFoundError, CommercialService
 from danfer_os.services.pcp import PcpService
 from danfer_os.services.technical_library import TechnicalLibrary
+from danfer_os.models.integrations import ErpEvent
+from danfer_os.services.integrations import IntegrationService
 
 
 def create_router(
@@ -16,6 +18,7 @@ def create_router(
     library: TechnicalLibrary,
     boms: BomService,
     pcp: PcpService,
+    integrations: IntegrationService,
 ) -> APIRouter:
     router = APIRouter(prefix="/workflows", tags=["fluxos integrados"])
 
@@ -52,6 +55,8 @@ def create_router(
                         quantity=item.quantity,
                         due_date=delivery,
                         priority=3,
+                        estimated_material_cost=item.material_cost * item.quantity,
+                        estimated_process_cost=(item.process_cost + item.indirect_cost) * item.quantity,
                         notes=f"Gerada pelo orçamento {quote.number}",
                     )
                 )
@@ -59,5 +64,16 @@ def create_router(
         if missing and not created:
             raise HTTPException(status_code=422, detail="; ".join(missing))
         return created
+
+    @router.post("/quotes/{quote_id}/erp-order", response_model=ErpEvent)
+    def quote_to_erp(quote_id: UUID) -> ErpEvent:
+        try:
+            quote = commercial.get_quote(quote_id)
+            client = commercial.get_client(quote.client_id)
+        except CommercialNotFoundError as error:
+            raise HTTPException(status_code=404, detail="orçamento ou cliente não encontrado") from error
+        if quote.status != QuoteStatus.APPROVED:
+            raise HTTPException(status_code=409, detail="o orçamento precisa estar aprovado")
+        return integrations.queue_quote(quote, client)
 
     return router

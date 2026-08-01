@@ -106,6 +106,9 @@ window.moveQuote = async (id, status) => {
     await req(`/commercial/quotes/${id}/status`, {
       method: "POST", body: JSON.stringify({status})
     });
+    if (status === "aprovado") {
+      await req(`/workflows/quotes/${id}/erp-order`, {method:"POST"});
+    }
     await quotes();
   } catch (error) {
     alert(error.message);
@@ -175,7 +178,7 @@ async function coordination() {
     req("/billing/profiles"), req("/requests"), req("/communications/messages")
   ]);
   $("#billing-profiles").innerHTML = profiles.map(item => `<div class="metric"><b>${esc(item.unit).toUpperCase()}</b><span>${esc(item.legal_name)}${item.erp_company_code ? " · ERP " + esc(item.erp_company_code) : ""}</span></div>`).join("");
-  $("#requests-table").innerHTML = table(["Número","Assunto","Destino","Prioridade","Status"], requests.map(item => `<tr><td><b>${esc(item.number)}</b><br><small>${esc(item.company_unit).toUpperCase()}</small></td><td>${esc(item.subject)}<br><small>${esc(item.requester)}</small></td><td>${esc(item.target_department)}</td><td>${pill(item.priority)}</td><td>${pill(item.status)}</td></tr>`));
+  $("#requests-table").innerHTML = table(["Número","Assunto","Destino","Previsão","Prioridade","Status"], requests.map(item => `<tr><td><b>${esc(item.number)}</b><br><small>${esc(item.company_unit).toUpperCase()}</small></td><td>${esc(item.subject)}<br><small>${esc(item.requester)}</small></td><td>${esc(item.target_department)}<br><small>${esc(item.assigned_to)}</small></td><td>${item.promised_date ? new Date(item.promised_date + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</td><td>${pill(item.priority)}</td><td>${pill(item.status)}</td></tr>`));
   $("#messages-table").innerHTML = table(["Canal","Destinatário","Mensagem","Status","Ação"], messages.map(item => `<tr><td>${esc(item.channel)}</td><td>${esc(item.recipient)}</td><td>${esc(item.body)}</td><td>${pill(item.status)}</td><td>${item.action_url ? `<a class="action" href="${esc(item.action_url)}" target="_blank" rel="noopener">Abrir</a>` : ""}</td></tr>`));
 }
 

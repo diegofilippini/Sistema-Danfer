@@ -131,8 +131,15 @@ class OperationsService:
         self.audit("notificacoes", "criar", str(item.id), item.title)
         return item.model_copy(deep=True)
 
-    def notifications(self) -> list[Notification]:
-        return [item.model_copy(deep=True) for item in reversed(self._notifications.values())]
+    def notifications(self, username: str = "", role: str = "") -> list[Notification]:
+        values = reversed(self._notifications.values())
+        if username or role:
+            values = (item for item in values if (
+                (not item.recipient_username and not item.recipient_role)
+                or item.recipient_username.casefold() == username.casefold()
+                or item.recipient_role.casefold() == role.casefold()
+            ))
+        return [item.model_copy(deep=True) for item in values]
 
     def read_notification(self, notification_id: UUID) -> Notification:
         current = self._notifications.get(notification_id)
