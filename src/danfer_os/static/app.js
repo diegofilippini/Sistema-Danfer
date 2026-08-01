@@ -121,6 +121,7 @@ async function library(query = "") {
 }
 
 async function bom() {
+  // Os catálogos ficam em uma tela própria, mas compartilham a Biblioteca Técnica.
   const data = await req("/boms");
   $("#boms").innerHTML = table(
     ["Produto","Revisão","Componentes","Status"],
@@ -175,7 +176,7 @@ async function maintenance() {
   );
 }
 
-const loaders = {dashboard, crm, quotes, library, bom, pcp, integrations, quality, maintenance};
+const loaders = {dashboard, crm, quotes, library, engineering, bom, pcp, integrations, quality, maintenance};
 document.querySelectorAll("nav button").forEach(button => {
   button.onclick = async () => {
     document.querySelectorAll("nav button,.view").forEach(item => item.classList.remove("active"));
@@ -197,6 +198,8 @@ dialogControls("#new-client", "#client-dialog", ".close-client");
 dialogControls("#new-quote", "#quote-dialog", ".close-quote");
 dialogControls("#new-quality", "#quality-dialog", ".close-quality");
 dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
+dialogControls("#new-material", "#material-dialog", ".close-material");
+dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
 
 $("#search").oninput = event => library(event.target.value);
 $("#client-search").oninput = event => crm(event.target.value);
@@ -211,6 +214,36 @@ $("#part-form").onsubmit = async event => {
     await req("/technical-library", {method:"POST", body:JSON.stringify(data)});
     $("#dialog").close(); event.target.reset(); await library();
   } catch (error) { $("#error").textContent = error.message; }
+};
+
+$("#material-form").onsubmit = async event => {
+  event.preventDefault();
+  const data = Object.fromEntries(new FormData(event.target));
+  ["thickness_mm", "price_per_kg", "density_kg_m3"].forEach(key => data[key] = Number(data[key]));
+  try {
+    await req("/catalogs/materials", {method:"POST", body:JSON.stringify(data)});
+    $("#material-dialog").close(); event.target.reset(); await engineering();
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
+};
+
+$("#dxf-form").onsubmit = async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.target));
+  const file = event.target.elements.dxf_file.files[0];
+  const content_base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const payload = {...values, filename:file.name, content_base64};
+  delete payload.dxf_file;
+  if (payload.thickness_mm) payload.thickness_mm = Number(payload.thickness_mm); else delete payload.thickness_mm;
+  try {
+    await req("/engineering/dxf/register", {method:"POST", body:JSON.stringify(payload)});
+    $("#dxf-dialog").close(); event.target.reset(); await engineering();
+    alert("DXF analisado e cadastrado na Biblioteca Técnica.");
+  } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
 $("#client-form").onsubmit = async event => {
@@ -248,6 +281,12 @@ function quoteItemFromForm(form) {
     utilization_percent:Number(form.item_utilization), margin_percent:Number(form.item_margin_percent),
     notes:form.item_notes, processes
   };
+}
+
+async function engineering() {
+  const [materials, operations] = await Promise.all([req("/catalogs/materials"), req("/catalogs/operations")]);
+  $("#material-catalog").innerHTML = table(["ERP","Material","Esp.","Preço/kg","Status"], materials.map(item => `<tr><td><b>${esc(item.erp_code)}</b></td><td>${esc(item.description)}<br><small>${esc(item.specification)}</small></td><td>${item.thickness_mm} mm</td><td>${money(item.price_per_kg)}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`));
+  $("#operation-catalog").innerHTML = table(["Código","Operação","Custeio","Valor hora"], operations.map(item => `<tr><td><b>${item.erp_code}</b></td><td>${esc(item.name)}</td><td>${esc(item.pricing_mode)}</td><td>${money(item.hourly_rate)}</td></tr>`));
 }
 
 function renderPendingQuoteItems() {

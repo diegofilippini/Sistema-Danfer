@@ -28,6 +28,8 @@ from danfer_os.services.engineering import EngineeringService
 from danfer_os.demo import seed_demo
 from danfer_os.routers.system import create_router as create_system_router
 from danfer_os.security import security_middleware
+from danfer_os.routers.catalogs import create_router as create_catalogs_router
+from danfer_os.services.catalogs import CatalogService
 
 
 def create_app(
@@ -38,7 +40,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.4.0",
+        version="0.5.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -55,6 +57,7 @@ def create_app(
     integration_service = IntegrationService(library)
     commercial_service = CommercialService(data_dir / "commercial.json")
     operations_service = OperationsService(data_dir / "operations.json")
+    catalog_service = CatalogService(data_dir / "catalogs.json")
     if os.getenv("DANFER_SEED_DEMO") == "1":
         seed_demo(
             library,
@@ -105,9 +108,10 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        create_engineering_router(EngineeringService()),
+        create_engineering_router(EngineeringService(), library),
         prefix="/api/v1",
     )
+    app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")
     static_dir = Path(__file__).with_name("static")
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
     return app

@@ -25,3 +25,12 @@ class DxfAnalysis(BaseModel):
     fill_factor_percent: float
     nesting_suggestion: NestingSuggestion
     warnings: list[str] = Field(default_factory=list)
+
+
+class DxfRegistration(DxfUpload):
+    danfer_code: str = Field(min_length=1, max_length=50)
+    customer_code: str = Field(default="", max_length=50)
+    customer: str = Field(default="", max_length=120)
+    material: str = Field(default="", max_length=100)
+    thickness_mm: float | None = Field(default=None, gt=0)
+    revision: str = Field(default="A", min_length=1, max_length=20)

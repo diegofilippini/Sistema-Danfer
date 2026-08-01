@@ -20,6 +20,7 @@ class PartStatus(StrEnum):
 
 
 class RoutingStep(BaseModel):
+    erp_code: int | None = Field(default=None, gt=0)
     process: str = Field(min_length=2, max_length=80)
     estimated_minutes: float = Field(ge=0)
 
@@ -34,6 +35,10 @@ class DocumentCreate(BaseModel):
     weight_kg: float | None = Field(default=None, ge=0)
     width_mm: float | None = Field(default=None, gt=0)
     length_mm: float | None = Field(default=None, gt=0)
+    cut_length_mm: float | None = Field(default=None, ge=0)
+    piercings: int | None = Field(default=None, ge=0)
+    fill_factor_percent: float | None = Field(default=None, ge=0, le=100)
+    nesting_mode: str = Field(default="automatico", max_length=30)
     family: str = Field(default="", max_length=80)
     group: str = Field(default="", max_length=80)
     status: PartStatus = PartStatus.ACTIVE
@@ -71,6 +76,10 @@ class DocumentUpdate(BaseModel):
     weight_kg: float | None = Field(default=None, ge=0)
     width_mm: float | None = Field(default=None, gt=0)
     length_mm: float | None = Field(default=None, gt=0)
+    cut_length_mm: float | None = Field(default=None, ge=0)
+    piercings: int | None = Field(default=None, ge=0)
+    fill_factor_percent: float | None = Field(default=None, ge=0, le=100)
+    nesting_mode: str | None = Field(default=None, max_length=30)
     family: str | None = Field(default=None, max_length=80)
     group: str | None = Field(default=None, max_length=80)
     status: PartStatus | None = None

@@ -17,6 +17,7 @@
     <button data-view="crm">◎ <span>CRM / Clientes</span></button>
     <button data-view="quotes">▧ <span>Orçamentos</span></button>
     <button data-view="library">▤ <span>Biblioteca Técnica</span></button>
+    <button data-view="engineering">⌖ <span>Engenharia / DXF</span></button>
     <button data-view="bom">⌘ <span>Estruturas BOM</span></button>
     <button data-view="pcp">◫ <span>PCP</span></button>
     <button data-view="integrations">⇄ <span>Integrações</span></button>
@@ -37,6 +38,10 @@
   <section id="library" class="view">
     <div class="toolbar"><input id="search" placeholder="Pesquisar código, descrição, cliente ou material"><button id="new">+ Nova peça</button></div>
     <article><div id="parts"></div></article>
+  </section>
+  <section id="engineering" class="view">
+    <div class="toolbar"><div><b>Cadastros de engenharia</b><br><small>Materiais, preços e operações integradas ao ERP</small></div><div><button id="new-material">+ Material</button> <button id="new-dxf">Importar DXF</button></div></div>
+    <div class="columns"><article><h2>Materiais</h2><div id="material-catalog"></div></article><article><h2>Operações ERP</h2><div id="operation-catalog"></div></article></div>
   </section>
   <section id="crm" class="view">
     <div class="toolbar"><input id="client-search" placeholder="Pesquisar nome, CNPJ/CPF ou contato"><button id="new-client">+ Novo cliente</button></div>
@@ -101,6 +106,8 @@
 </form></dialog>
 <dialog id="quality-dialog"><form id="quality-form"><div class="modal-head"><div><p>QUALIDADE</p><h2>Nova ocorrência</h2></div><button type="button" class="close-quality">×</button></div><div class="form-grid"><label>Tipo<select name="type"><option value="retrabalho">Retrabalho</option><option value="refugo">Refugo</option><option value="nao_conformidade">Não conformidade</option><option value="reclamacao_cliente">Reclamação</option></select></label><label>OP<input name="production_order"></label><label class="wide">Descrição<input name="description" required></label><label>Responsável<input name="responsible"></label><label>Custo<input name="cost" type="number" value="0" step=".01"></label></div><footer><button type="button" class="cancel close-quality">Cancelar</button><button>Registrar</button></footer></form></dialog>
 <dialog id="maintenance-dialog"><form id="maintenance-form"><div class="modal-head"><div><p>MANUTENÇÃO</p><h2>Nova ordem</h2></div><button type="button" class="close-maintenance">×</button></div><div class="form-grid"><label>Equipamento<input name="equipment" required></label><label>Tipo<select name="type"><option value="preventiva">Preventiva</option><option value="corretiva">Corretiva</option><option value="inspecao">Inspeção</option></select></label><label class="wide">Descrição<input name="description" required></label><label>Data programada<input name="scheduled_date" type="date"></label><label>Responsável<input name="responsible"></label></div><footer><button type="button" class="cancel close-maintenance">Cancelar</button><button>Registrar</button></footer></form></dialog>
+<dialog id="material-dialog"><form id="material-form"><div class="modal-head"><div><p>ENGENHARIA</p><h2>Novo material</h2></div><button type="button" class="close-material">×</button></div><div class="form-grid"><label>Código ERP<input name="erp_code" required></label><label>Descrição<input name="description" required></label><label>Especificação<input name="specification"></label><label>Espessura (mm)<input name="thickness_mm" type="number" min=".01" step=".01" required></label><label>Preço (R$/kg)<input name="price_per_kg" type="number" min="0" step=".01" required></label><label>Densidade (kg/m³)<input name="density_kg_m3" type="number" value="7850" min="1"></label></div><div class="dialog-error"></div><footer><button type="button" class="cancel close-material">Cancelar</button><button>Salvar material</button></footer></form></dialog>
+<dialog id="dxf-dialog"><form id="dxf-form"><div class="modal-head"><div><p>ENGENHARIA</p><h2>Importar DXF</h2></div><button type="button" class="close-dxf">×</button></div><div class="form-grid"><label>Código Danfer<input name="danfer_code" required></label><label>Código cliente<input name="customer_code"></label><label>Cliente<input name="customer"></label><label>Material<input name="material"></label><label>Espessura (mm)<input name="thickness_mm" type="number" min=".01" step=".01"></label><label>Revisão<input name="revision" value="A" required></label><label class="wide">Arquivo DXF<input name="dxf_file" type="file" accept=".dxf" required></label></div><div class="dialog-error"></div><footer><button type="button" class="cancel close-dxf">Cancelar</button><button>Analisar e cadastrar</button></footer></form></dialog>
 <script src="/app.js"></script>
 </body>
 </html>
