@@ -3,18 +3,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
-from reportlab.lib import colors
-from reportlab.lib.enums import TA_RIGHT
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import mm
-from reportlab.platypus import (
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
 
 from danfer_os.models.commercial import (
     Client,
@@ -33,6 +21,7 @@ from danfer_os.services.commercial import (
     CommercialService,
     CommercialValidationError,
 )
+from danfer_os.proposal import build_proposal_pdf
 
 
 def create_router(service: CommercialService) -> APIRouter:
@@ -124,76 +113,7 @@ def create_router(service: CommercialService) -> APIRouter:
             client = service.get_client(quote.client_id)
         except CommercialNotFoundError as error:
             raise HTTPException(status_code=404, detail="orçamento não encontrado") from error
-        buffer = BytesIO()
-        document = SimpleDocTemplate(
-            buffer,
-            pagesize=A4,
-            rightMargin=15 * mm,
-            leftMargin=15 * mm,
-            topMargin=15 * mm,
-            bottomMargin=15 * mm,
-        )
-        styles = getSampleStyleSheet()
-        right = ParagraphStyle("right", parent=styles["Normal"], alignment=TA_RIGHT)
-        story = [
-            Paragraph("<b>DANFER</b> — Transformando aço em soluções", styles["Title"]),
-            Paragraph(
-                f"<b>ORÇAMENTO {quote.number} · REV. {quote.revision}</b>",
-                right,
-            ),
-            Spacer(1, 8 * mm),
-            Paragraph(f"<b>Cliente:</b> {client.name}", styles["Normal"]),
-            Paragraph(f"<b>Solicitante:</b> {quote.requester or client.contact}", styles["Normal"]),
-            Paragraph(f"<b>Validade:</b> {quote.valid_until:%d/%m/%Y}", styles["Normal"]),
-            Paragraph(
-                f"<b>Frete:</b> {quote.freight_type.value} — por conta de {quote.freight_payer.value}",
-                styles["Normal"],
-            ),
-            Spacer(1, 6 * mm),
-        ]
-        rows = [["Código", "Descrição", "Qtd.", "Unitário", "Total"]]
-        rows.extend(
-            [
-                item.code,
-                item.description,
-                f"{item.quantity:g} {item.unit}",
-                f"R$ {item.unit_price:,.2f}",
-                f"R$ {item.total_price:,.2f}",
-            ]
-            for item in quote.items
-        )
-        table = Table(rows, colWidths=[28 * mm, 72 * mm, 24 * mm, 27 * mm, 27 * mm])
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0A4775")),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#B8C4CE")),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F1F5F8")]),
-                ]
-            )
-        )
-        story.extend(
-            [
-                table,
-                Spacer(1, 6 * mm),
-                Paragraph(f"<b>Subtotal:</b> R$ {quote.subtotal:,.2f}", right),
-                Paragraph(f"<b>Tributos:</b> R$ {quote.taxes:,.2f}", right),
-                Paragraph(f"<b>TOTAL:</b> R$ {quote.total:,.2f}", right),
-                Spacer(1, 8 * mm),
-                Paragraph(f"<b>Observações:</b> {quote.observations or '—'}", styles["Normal"]),
-            ]
-        )
-        if any("inox" in item.material.casefold() for item in quote.items):
-            settings = service.settings()
-            if settings.inox_warning_enabled:
-                story.extend([Spacer(1, 4 * mm), Paragraph(settings.inox_warning, styles["Normal"])])
-        document.build(story)
-        buffer.seek(0)
+        buffer = BytesIO(build_proposal_pdf(quote, client))
         return StreamingResponse(
             buffer,
             media_type="application/pdf",

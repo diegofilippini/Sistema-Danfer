@@ -33,6 +33,9 @@ def quote_payload(client_id: str) -> dict:
         "valid_until": str(date.today() + timedelta(days=10)),
         "margin_percent": 25,
         "ipi_percent": 5,
+        "cbs_percent": 0.9,
+        "ibs_percent": 0.1,
+        "prepared_by": "Diego Filippini",
         "items": [
             {
                 "code": "DF-ORC-1",
@@ -43,6 +46,7 @@ def quote_payload(client_id: str) -> dict:
                 "net_weight_kg": 10,
                 "material_price_kg": 5,
                 "utilization_percent": 80,
+                "margin_percent": 30,
                 "processes": [
                     {"name": "Corte laser", "minutes": 10, "hourly_rate": 180},
                     {"name": "Dobra", "minutes": 5, "hourly_rate": 120},
@@ -87,6 +91,7 @@ def test_quote_calculation_revision_status_and_pdf(tmp_path: Path) -> None:
     assert pdf.status_code == 200
     assert pdf.headers["content-type"] == "application/pdf"
     assert pdf.content.startswith(b"%PDF")
+    assert len(pdf.content) > 4000
 
 
 def test_crm_search_and_duplicate_document(tmp_path: Path) -> None:

@@ -164,7 +164,10 @@ class CommercialService:
         base_cost = material_cost + process_cost
         indirect = base_cost * self._settings.indirect_percent / 100
         total_cost = base_cost + indirect
-        calculated_price = total_cost / (1 - margin_percent / 100)
+        effective_margin = (
+            data.margin_percent if data.margin_percent is not None else margin_percent
+        )
+        calculated_price = total_cost / (1 - effective_margin / 100)
         unit_price = (
             data.manual_unit_price
             if data.manual_unit_price is not None

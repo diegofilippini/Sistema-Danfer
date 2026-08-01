@@ -98,6 +98,7 @@ class QuoteItemCreate(BaseModel):
     utilization_percent: float = Field(default=80, gt=0, le=100)
     processes: list[QuoteProcess] = Field(default_factory=list)
     manual_unit_price: float | None = Field(default=None, ge=0)
+    margin_percent: float | None = Field(default=None, ge=0, lt=100)
     notes: str = Field(default="", max_length=1000)
 
 
@@ -115,6 +116,7 @@ class QuoteCreate(BaseModel):
     type: QuoteType
     client_id: UUID
     requester: str = Field(default="", max_length=120)
+    prepared_by: str = Field(default="Equipe Comercial Danfer", max_length=120)
     valid_until: date
     expected_delivery: date | None = None
     payment_terms: str = Field(default="", max_length=100)
@@ -135,6 +137,7 @@ class QuoteCreate(BaseModel):
 
 class QuoteUpdate(BaseModel):
     requester: str | None = Field(default=None, max_length=120)
+    prepared_by: str | None = Field(default=None, max_length=120)
     valid_until: date | None = None
     expected_delivery: date | None = None
     payment_terms: str | None = Field(default=None, max_length=100)

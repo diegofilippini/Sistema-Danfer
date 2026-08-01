@@ -238,15 +238,20 @@ $("#quote-form").onsubmit = async event => {
   if (Number(form.bend_minutes)) processes.push({name:"Dobra", minutes:Number(form.bend_minutes), hourly_rate:Number(form.bend_rate), external_cost:0});
   const payload = {
     type:form.type, client_id:form.client_id, requester:form.requester,
+    prepared_by:form.prepared_by,
     valid_until:form.valid_until, expected_delivery:form.expected_delivery || null,
-    payment_terms:form.payment_terms, margin_percent:Number(form.margin_percent),
-    ipi_percent:Number(form.ipi_percent), observations:form.observations,
+    payment_terms:form.payment_terms, freight_type:form.freight_type,
+    nature_operation:form.nature_operation, tax_scenario:form.tax_scenario,
+    margin_percent:Number(form.margin_percent), ipi_percent:Number(form.ipi_percent),
+    cbs_percent:Number(form.cbs_percent), ibs_percent:Number(form.ibs_percent),
+    discount_value:Number(form.discount_value), observations:form.observations,
     items:[{
       code:form.item_code, description:form.item_description,
       quantity:Number(form.item_quantity), material:form.item_material,
       thickness_mm:form.item_thickness ? Number(form.item_thickness) : null,
       net_weight_kg:Number(form.item_weight), material_price_kg:Number(form.item_material_price),
-      utilization_percent:Number(form.item_utilization), processes
+      utilization_percent:Number(form.item_utilization),
+      margin_percent:Number(form.item_margin_percent), notes:form.item_notes, processes
     }]
   };
   try {
