@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Cookie, HTTPException, Response, status
 
-from danfer_os.models.auth import LoginRequest, LoginResult, User, UserCreate
+from danfer_os.models.auth import LoginRequest, LoginResult, PasswordChange, User, UserCreate
 from danfer_os.services.auth import AuthenticationError, AuthService
 
 
@@ -51,5 +51,19 @@ def create_router(service: AuthService) -> APIRouter:
     @router.get("/users", response_model=list[User])
     def users() -> list[User]:
         return service.list_users()
+
+    @router.post("/change-password", response_model=User)
+    def change_password(
+        data: PasswordChange,
+        danfer_session: str | None = Cookie(default=None),
+    ) -> User:
+        if not danfer_session:
+            raise HTTPException(status_code=401, detail="não autenticado")
+        try:
+            return service.change_password(
+                danfer_session, data.current_password, data.new_password
+            )
+        except AuthenticationError as error:
+            raise HTTPException(status_code=401, detail=str(error)) from error
 
     return router

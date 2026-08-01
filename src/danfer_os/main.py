@@ -26,18 +26,24 @@ from danfer_os.routers.workflows import create_router as create_workflows_router
 from danfer_os.routers.engineering import create_router as create_engineering_router
 from danfer_os.services.engineering import EngineeringService
 from danfer_os.demo import seed_demo
+from danfer_os.routers.system import create_router as create_system_router
+from danfer_os.security import security_middleware
 
 
 def create_app(
     library: TechnicalLibrary | None = None,
     data_dir: Path = Path("data"),
+    enforce_auth: bool = False,
 ) -> FastAPI:
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="0.3.0",
+        version="0.4.0",
         description="API central para os módulos industriais da Danfer.",
     )
+    auth_service = AuthService(data_dir / "auth.json")
+    if enforce_auth:
+        app.middleware("http")(security_middleware(auth_service))
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(
         create_router(library),
@@ -85,9 +91,10 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        create_auth_router(AuthService(data_dir / "auth.json")),
+        create_auth_router(auth_service),
         prefix="/api/v1",
     )
+    app.include_router(create_system_router(data_dir), prefix="/api/v1")
     app.include_router(
         create_workflows_router(
             commercial_service,
@@ -106,4 +113,4 @@ def create_app(
     return app
 
 
-app = create_app()
+app = create_app(enforce_auth=True)

@@ -101,3 +101,13 @@ class AuthService:
 
     def logout(self, token: str) -> None:
         self._sessions.pop(token, None)
+
+    def change_password(self, token: str, current: str, new: str) -> User:
+        user = self.session(token)
+        stored, encoded = self._users[user.id]
+        if not self._verify(current, encoded):
+            raise AuthenticationError("senha atual inválida")
+        updated = stored.model_copy(update={"must_change_password": False})
+        self._users[user.id] = (updated, self._hash(new))
+        self._save()
+        return updated.model_copy(deep=True)
