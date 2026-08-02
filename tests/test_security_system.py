@@ -15,7 +15,7 @@ def test_auth_enforcement_roles_password_and_backup(tmp_path: Path) -> None:
     changed = client.post("/api/v1/auth/change-password", json={"current_password": "Danfer@2026", "new_password": "NovaSenha@2026"})
     assert changed.status_code == 200
     assert changed.json()["must_change_password"] is False
-    assert client.get("/api/v1/system/version").json() == {"version": "1.5.0", "data_schema": "2"}
+    assert client.get("/api/v1/system/version").json() == {"version": "1.6.0", "data_schema": "3"}
     backup = client.get("/api/v1/system/backup")
     assert backup.status_code == 200
     assert backup.content.startswith(b"PK")
@@ -71,6 +71,33 @@ def test_commercial_role_cannot_access_pcp_or_system_administration(tmp_path: Pa
     assert "price_per_kg" not in options.json()[0]
     assert commercial.get("/api/v1/pcp/orders").status_code == 403
     assert commercial.get("/api/v1/system/version").status_code == 403
+
+
+def test_global_search_respects_configured_module_permissions(tmp_path: Path) -> None:
+    admin = TestClient(create_app(data_dir=tmp_path, enforce_auth=True))
+    admin.post("/api/v1/auth/login", json={"username": "admin", "password": "Danfer@2026"})
+    admin.post("/api/v1/auth/change-password", json={
+        "current_password": "Danfer@2026", "new_password": "AdminNova@2026",
+    })
+    admin.post("/api/v1/commercial/clients", json={"name": "Cliente Confidencial Busca"})
+    created = admin.post("/api/v1/auth/users", json={
+        "username": "engenheiro", "name": "Engenharia", "password": "Engenharia@2026",
+        "role": "engenharia",
+    }).json()
+    admin.patch(f"/api/v1/auth/users/{created['id']}", json={
+        "active": True, "permissions": ["engineering"],
+    })
+
+    engineering = TestClient(create_app(data_dir=tmp_path, enforce_auth=True))
+    engineering.post("/api/v1/auth/login", json={
+        "username": "engenheiro", "password": "Engenharia@2026",
+    })
+    engineering.post("/api/v1/auth/change-password", json={
+        "current_password": "Engenharia@2026", "new_password": "EngenhariaNova@2026",
+    })
+    response = engineering.get("/api/v1/search", params={"q": "Cliente Confidencial"})
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_only_admin_can_manage_cost_settings(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.5.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.6.0`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
 
 ### Acesso para testes
@@ -17,7 +17,7 @@ controle de acesso por perfil e API integrada.
 Na primeira execução dos pacotes de teste, o sistema cria dados demonstrativos
 de cliente, orçamento, peças, BOM, ordem de produção, qualidade e manutenção.
 
-## Versão 1.5.0 — Custeio por nesting integrado
+## Versão 1.6.0 — Consolidação comercial, PCP e faturamento
 
 - cálculo geométrico em lote por material e espessura, inclusive em múltiplas chapas;
 - custo de material baseado no aproveitamento efetivamente calculado;

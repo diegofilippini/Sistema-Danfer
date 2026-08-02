@@ -9,6 +9,8 @@ from danfer_os.models.commercial import (
     ClientCreate,
     ClientUpdate,
     CostSettings,
+    PriceAdjustment,
+    PriceAdjustmentCreate,
     CustomerProposalCreate,
     CustomerProposalDecision,
     Quote,
@@ -65,6 +67,22 @@ def create_router(service: CommercialService) -> APIRouter:
     @router.get("/quote-bend-times", response_model=dict[str, float])
     def quote_bend_times() -> dict[str, float]:
         return service.bend_time_settings()
+
+    @router.get("/price-adjustments", response_model=list[PriceAdjustment])
+    def price_adjustments() -> list[PriceAdjustment]:
+        return service.price_adjustments()
+
+    @router.post("/price-adjustments", response_model=PriceAdjustment, status_code=201)
+    def create_price_adjustment(data: PriceAdjustmentCreate, request: Request) -> PriceAdjustment:
+        user = getattr(request.state, "user", None)
+        if user is not None and user.role.value != "administrador":
+            raise HTTPException(403, "somente o administrador pode registrar reajustes")
+        if user is not None and not data.adjusted_by:
+            data = data.model_copy(update={"adjusted_by": user.name})
+        try:
+            return service.create_price_adjustment(data)
+        except CommercialNotFoundError as error:
+            raise HTTPException(404, "cliente não encontrado") from error
 
     @router.post("/quotes", response_model=Quote, status_code=status.HTTP_201_CREATED)
     def create_quote(data: QuoteCreate) -> Quote:

@@ -8,6 +8,42 @@ class DxfUpload(BaseModel):
     content_base64: str = Field(min_length=1)
 
 
+class PdfDrawingUpload(DxfUpload):
+    reference_dimension_mm: float | None = Field(default=None, gt=0)
+
+
+class PdfDimensionCandidate(BaseModel):
+    label: str
+    value_mm: float = Field(gt=0)
+    kind: str
+    confidence_percent: int = Field(ge=0, le=100)
+
+
+class PdfDrawingAnalysis(BaseModel):
+    filename: str
+    page_count: int = Field(gt=0)
+    source_type: str
+    width_mm: float | None = Field(default=None, gt=0)
+    height_mm: float | None = Field(default=None, gt=0)
+    dimensions: list[PdfDimensionCandidate] = Field(default_factory=list)
+    extracted_text: str = ""
+    requires_confirmation: bool = True
+    warnings: list[str] = Field(default_factory=list)
+
+
+class PdfDrawingConfirmation(BaseModel):
+    filename: str = Field(min_length=5, max_length=255)
+    code: str = Field(min_length=1, max_length=60)
+    description: str = Field(min_length=2, max_length=160)
+    quantity: int = Field(default=1, gt=0, le=500)
+    material: str = Field(default="", max_length=100)
+    thickness_mm: float = Field(gt=0)
+    width_mm: float = Field(gt=0)
+    height_mm: float = Field(gt=0)
+    cut_length_mm: float | None = Field(default=None, gt=0)
+    confirmed: bool
+
+
 class NestingSuggestion(StrEnum):
     AUTOMATIC = "automatico"
     FORCE = "forcar_ncav"

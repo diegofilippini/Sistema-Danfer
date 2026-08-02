@@ -19,6 +19,7 @@ class FreightPayer(StrEnum):
 
 class ClientCreate(BaseModel):
     name: str = Field(min_length=2, max_length=160)
+    erp_code: str = Field(default="", max_length=50)
     document: str = Field(default="", max_length=20)
     state_registration: str = Field(default="", max_length=30)
     contact: str = Field(default="", max_length=120)
@@ -35,6 +36,7 @@ class ClientCreate(BaseModel):
 
 class ClientUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=160)
+    erp_code: str | None = Field(default=None, max_length=50)
     document: str | None = Field(default=None, max_length=20)
     state_registration: str | None = Field(default=None, max_length=30)
     contact: str | None = Field(default=None, max_length=120)
@@ -60,14 +62,23 @@ class QuoteType(StrEnum):
     SERVICE = "servico"
 
 
+class CommercialOperation(StrEnum):
+    SALE_INDUSTRIALIZATION = "venda_industrializacao"
+    SALE_USE_CONSUMPTION = "venda_uso_consumo"
+    INDUSTRIALIZATION = "industrializacao"
+    THIRD_PARTY_MATERIAL = "industrializacao_material_terceiros"
+
+
 class QuoteStatus(StrEnum):
     DRAFT = "em_elaboracao"
     SENT = "enviado"
     NEGOTIATION = "em_negociacao"
     PENDING_ADMIN_APPROVAL = "aguardando_aprovacao_administrativa"
     APPROVED = "aprovado"
+    PARTIALLY_INVOICED = "faturamento_parcial"
     LOST = "perdido"
     CANCELLED = "cancelado"
+    INVOICED = "faturado"
 
 
 class NestingMode(StrEnum):
@@ -151,6 +162,7 @@ class QuoteItem(QuoteItemCreate):
 
 class QuoteCreate(BaseModel):
     type: QuoteType
+    commercial_operation: CommercialOperation = CommercialOperation.SALE_INDUSTRIALIZATION
     billing_unit: CompanyUnit = CompanyUnit.DANFER
     client_id: UUID
     requester: str = Field(default="", max_length=120)
@@ -174,6 +186,7 @@ class QuoteCreate(BaseModel):
 
 
 class QuoteUpdate(BaseModel):
+    commercial_operation: CommercialOperation | None = None
     billing_unit: CompanyUnit | None = None
     requester: str | None = Field(default=None, max_length=120)
     prepared_by: str | None = Field(default=None, max_length=120)
@@ -209,6 +222,8 @@ class Quote(QuoteCreate):
     gross_profit: float = 0
     effective_margin_percent: float = 0
     customer_proposals: list["CustomerProposal"] = Field(default_factory=list)
+    invoiced_quantities: dict[str, float] = Field(default_factory=dict)
+    invoice_count: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -266,20 +281,24 @@ class CostSettings(BaseModel):
     institutional_page_minimum: float = Field(default=10000, ge=0)
     default_margin_percent: float = Field(default=30, ge=0, lt=100)
     minimum_effective_margin_percent: float = Field(default=20, ge=0, lt=100)
+    sale_industrialization_price_review_days: int = Field(default=30, ge=1, le=3650)
+    sale_consumption_price_review_days: int = Field(default=30, ge=1, le=3650)
+    industrialization_price_review_days: int = Field(default=180, ge=1, le=3650)
+    third_party_material_price_review_days: int = Field(default=180, ge=1, le=3650)
     default_item_utilization_percent: float = Field(default=80, gt=0, le=100)
     default_ipi_percent: float = Field(default=0, ge=0, le=100)
     default_cbs_percent: float = Field(default=0, ge=0, le=100)
     default_ibs_percent: float = Field(default=0, ge=0, le=100)
-    default_cut_hourly_rate: float = Field(default=180, ge=0)
+    default_cut_hourly_rate: float = Field(default=360, ge=0)
     default_laser_cutting_speed_mm_min: float = Field(default=2000, gt=0)
     default_laser_piercing_seconds: float = Field(default=1, ge=0)
-    default_bend_hourly_rate: float = Field(default=120, ge=0)
+    default_bend_hourly_rate: float = Field(default=260, ge=0)
     bend_time_1_piece_minutes: float = Field(default=10, ge=0)
     bend_time_2_pieces_minutes: float = Field(default=5, ge=0)
     bend_time_3_pieces_minutes: float = Field(default=4, ge=0)
     bend_time_4_to_5_pieces_minutes: float = Field(default=3, ge=0)
     bend_time_6_plus_pieces_minutes: float = Field(default=2.5, ge=0)
-    default_roll_hourly_rate: float = Field(default=150, ge=0)
+    default_roll_hourly_rate: float = Field(default=240, ge=0)
     default_nesting_gap_mm: float = Field(default=5, ge=0, le=100)
     indirect_percent: float = Field(default=12, ge=0, le=100)
     small_bend_batch_limit: int = Field(default=5, ge=0)
@@ -301,3 +320,19 @@ class CostSettings(BaseModel):
     gap_rules: list[tuple[float, float]] = Field(
         default_factory=lambda: [(3.0, 3), (6.35, 5), (12.7, 8), (19.05, 10), (999, 12)]
     )
+
+
+class PriceAdjustmentCreate(BaseModel):
+    client_id: UUID
+    item_code: str = Field(min_length=1, max_length=60)
+    commercial_operation: CommercialOperation
+    previous_unit_price: float = Field(ge=0)
+    new_unit_price: float = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=500)
+    effective_date: date = Field(default_factory=date.today)
+    adjusted_by: str = Field(default="", max_length=120)
+
+
+class PriceAdjustment(PriceAdjustmentCreate):
+    id: UUID = Field(default_factory=uuid4)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

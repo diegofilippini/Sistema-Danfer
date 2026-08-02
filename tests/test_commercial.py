@@ -142,6 +142,10 @@ def test_cost_settings_keep_recovered_defaults(tmp_path: Path) -> None:
     assert settings["default_sheet_width_mm"] == 1200
     assert settings["default_sheet_length_mm"] == 3000
     assert settings["alternative_minimum_gain_percent"] == 8
+    assert settings["sale_industrialization_price_review_days"] == 30
+    assert settings["sale_consumption_price_review_days"] == 30
+    assert settings["industrialization_price_review_days"] == 180
+    assert settings["third_party_material_price_review_days"] == 180
 
 
 def test_laser_uses_perimeter_piercings_and_preserves_additional_time(tmp_path: Path) -> None:

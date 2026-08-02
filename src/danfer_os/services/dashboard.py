@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import date
+from datetime import date, timedelta
 
 from danfer_os.models.bom import BomStatus
 from danfer_os.models.dashboard import DashboardSummary, StatusIndicator
@@ -55,3 +55,28 @@ class DashboardService:
             next_orders=self._pcp.sequence()[:10],
             material_demand=self._pcp.material_groups()[:10],
         )
+
+    def delivery_board(self, days: int) -> dict:
+        if days not in {7, 14, 21, 30}:
+            raise ValueError("período permitido: 7, 14, 21 ou 30 dias")
+        today = date.today()
+        terminal = {ProductionStatus.COMPLETED, ProductionStatus.CANCELLED}
+        active = [item for item in self._pcp.list() if item.status not in terminal]
+
+        def top_clients(orders: list) -> list[dict]:
+            grouped: dict[str, list] = {}
+            for order in orders:
+                grouped.setdefault(order.client_name or "Cliente não informado", []).append(order)
+            ranked = sorted(grouped.items(), key=lambda item: (-len(item[1]), item[0].casefold()))[:10]
+            return [{"client": name, "total": len(values), "orders": [item.number for item in values]}
+                    for name, values in ranked]
+
+        columns = [{"date": "overdue", "label": "Atrasados", "weekday": "",
+                    "status": "red", "clients": top_clients([item for item in active if item.due_date < today])}]
+        weekdays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+        for offset in range(days):
+            day = today + timedelta(days=offset)
+            columns.append({"date": day.isoformat(), "label": day.strftime("%d/%m"),
+                            "weekday": weekdays[day.weekday()], "status": "yellow" if offset == 0 else "green",
+                            "clients": top_clients([item for item in active if item.due_date == day])})
+        return {"days": days, "generated_on": today.isoformat(), "columns": columns}

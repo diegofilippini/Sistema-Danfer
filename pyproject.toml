@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "danfer-industrial-os"
-version = "1.5.0"
+version = "1.6.0"
 description = "Sistema operacional industrial da Danfer"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ dependencies = [
     "openpyxl>=3.1,<4",
     "xlrd>=2,<3",
     "reportlab>=4,<6",
+    "pymupdf>=1.26,<2",
     "ezdxf>=1.4,<2",
     "pywebpush>=2,<3",
 ]

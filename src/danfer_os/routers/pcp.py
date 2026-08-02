@@ -1,7 +1,9 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi.responses import StreamingResponse
+from io import BytesIO
 
 from danfer_os.models.pcp import (
     MaterialGroup,
@@ -24,6 +26,7 @@ from danfer_os.services.pcp import (
     PcpValidationError,
     ProductionOrderNotFoundError,
 )
+from danfer_os.production_order_pdf import build_production_orders_pdf
 
 
 def create_router(service: PcpService) -> APIRouter:
@@ -39,6 +42,18 @@ def create_router(service: PcpService) -> APIRouter:
     @router.get("/orders", response_model=list[ProductionOrder])
     def list_orders(status_filter: ProductionStatus | None = None) -> list[ProductionOrder]:
         return service.list(status_filter)
+
+    @router.get("/orders-print.pdf")
+    def print_orders(ids: list[UUID] = Query(min_length=1)) -> StreamingResponse:
+        try:
+            orders = [service.get(order_id) for order_id in ids]
+        except ProductionOrderNotFoundError as error:
+            raise HTTPException(status_code=404, detail="ordem não encontrada") from error
+        filename = orders[0].number if len(orders) == 1 else f"OPs-{len(orders)}"
+        return StreamingResponse(
+            BytesIO(build_production_orders_pdf(orders)), media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{filename}.pdf"'},
+        )
 
     @router.get("/sequence", response_model=list[ProductionOrder])
     def sequence() -> list[ProductionOrder]:
@@ -79,7 +94,10 @@ def create_router(service: PcpService) -> APIRouter:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
     @router.post("/direct-requests", response_model=DirectProductionRequest, status_code=201)
-    def create_direct_request(data: DirectProductionRequestCreate) -> DirectProductionRequest:
+    def create_direct_request(data: DirectProductionRequestCreate, request: Request) -> DirectProductionRequest:
+        user = getattr(request.state, "user", None)
+        if user is not None:
+            data = data.model_copy(update={"requested_by": user.name})
         return service.create_direct_request(data)
 
     @router.get("/direct-requests", response_model=list[DirectProductionRequest])

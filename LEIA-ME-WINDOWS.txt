@@ -1,4 +1,4 @@
-DANFER INDUSTRIAL OS 1.5.0 - VERSAO WEB LOCAL
+DANFER INDUSTRIAL OS 1.6.0 - VERSAO WEB LOCAL
 
 1. Extraia todo o conteudo deste ZIP para uma pasta.
 2. Execute "INICIAR_WEB.bat".

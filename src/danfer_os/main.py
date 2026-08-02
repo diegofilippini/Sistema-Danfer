@@ -38,6 +38,8 @@ from danfer_os.services.crm import CrmService
 from danfer_os.routers.search import create_router as create_search_router
 from danfer_os.routers.push import create_router as create_push_router
 from danfer_os.services.push import PushService
+from danfer_os.routers.maintenance import create_router as create_maintenance_router
+from danfer_os.services.maintenance import MaintenanceService
 
 
 def create_app(
@@ -49,7 +51,7 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="1.5.0",
+        version="1.6.0",
         description="API central para os módulos industriais da Danfer.",
     )
     auth_service = AuthService(data_dir / "auth.json")
@@ -73,6 +75,7 @@ def create_app(
     push_service = PushService(data_dir / "push-subscriptions.json")
     operations_service = OperationsService(data_dir / "operations.json", push_service)
     catalog_service = CatalogService(data_dir / "catalogs.json")
+    maintenance_service = MaintenanceService(data_dir / "maintenance-config.json")
     commercial_service = CommercialService(data_dir / "commercial.json", catalog_service, operations_service)
     if os.getenv("DANFER_SEED_DEMO") == "1":
         seed_demo(
@@ -133,6 +136,7 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")
+    app.include_router(create_maintenance_router(maintenance_service), prefix="/api/v1")
     coordination_service = CoordinationService(
         None if isolated_test_mode else data_dir / "coordination.json",
         operations_service,

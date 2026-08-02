@@ -140,6 +140,7 @@ class IntegrationService:
             payload={
                 "quote_number": quote.number, "revision": quote.revision,
                 "customer": client.name, "customer_document": client.document,
+                "erp_customer_code": client.erp_code,
                 "nature_operation": quote.nature_operation,
                 "payment_terms": quote.payment_terms or client.payment_terms,
                 "freight_type": quote.freight_type.value,
@@ -150,6 +151,28 @@ class IntegrationService:
                     "unit_price": item.unit_price, "total_price": item.total_price,
                     "material": item.material, "thickness_mm": item.thickness_mm,
                 } for item in quote.items],
+            },
+        )
+        self._erp_events[event.id] = event
+        self._save()
+        return event.model_copy(deep=True)
+
+    def queue_invoice(self, quote: Quote, client: Client, quantities: dict[UUID, float]) -> ErpEvent:
+        selected = [(item, quantities[item.id]) for item in quote.items if item.id in quantities]
+        subtotal = round(sum(item.unit_price * quantity for item, quantity in selected), 2)
+        total = round(quote.total * subtotal / quote.subtotal, 2) if quote.subtotal else subtotal
+        event = ErpEvent(
+            entity="orcamento", entity_id=quote.id, action="faturar",
+            company_unit=quote.billing_unit,
+            payload={
+                "quote_number": quote.number, "revision": quote.revision,
+                "customer": client.name, "erp_customer_code": client.erp_code,
+                "customer_document": client.document, "subtotal": subtotal, "total": total,
+                "invoice_sequence": quote.invoice_count + 1,
+                "partial": any(quantity < item.quantity for item, quantity in selected) or len(selected) < len(quote.items),
+                "items": [{"item_id": str(item.id), "code": item.code, "quantity": quantity,
+                           "unit_price": item.unit_price, "total_price": round(item.unit_price * quantity, 2)}
+                          for item, quantity in selected],
             },
         )
         self._erp_events[event.id] = event

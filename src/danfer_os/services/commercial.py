@@ -22,6 +22,8 @@ from danfer_os.models.commercial import (
     QuoteItem,
     QuoteItemCreate,
     NestingMode,
+    PriceAdjustment,
+    PriceAdjustmentCreate,
     QuoteRevision,
     QuoteStatus,
     QuoteUpdate,
@@ -47,9 +49,11 @@ class CommercialService:
         QuoteStatus.SENT: {QuoteStatus.NEGOTIATION, QuoteStatus.APPROVED, QuoteStatus.LOST},
         QuoteStatus.NEGOTIATION: {QuoteStatus.SENT, QuoteStatus.APPROVED, QuoteStatus.LOST},
         QuoteStatus.PENDING_ADMIN_APPROVAL: {QuoteStatus.NEGOTIATION, QuoteStatus.APPROVED},
-        QuoteStatus.APPROVED: set(),
+        QuoteStatus.APPROVED: {QuoteStatus.PARTIALLY_INVOICED, QuoteStatus.INVOICED},
+        QuoteStatus.PARTIALLY_INVOICED: {QuoteStatus.INVOICED},
         QuoteStatus.LOST: {QuoteStatus.DRAFT},
         QuoteStatus.CANCELLED: {QuoteStatus.DRAFT},
+        QuoteStatus.INVOICED: set(),
     }
 
     @staticmethod
@@ -63,6 +67,7 @@ class CommercialService:
         self._clients: dict[UUID, Client] = {}
         self._quotes: dict[UUID, Quote] = {}
         self._revisions: dict[UUID, list[QuoteRevision]] = {}
+        self._price_adjustments: list[PriceAdjustment] = []
         self._settings = CostSettings()
         self._quote_sequence = 0
         self._lock = RLock()
@@ -85,6 +90,7 @@ class CommercialService:
             for key, values in payload.get("revisions", {}).items()
         }
         self._settings = CostSettings.model_validate(payload.get("settings", {}))
+        self._price_adjustments = [PriceAdjustment.model_validate(item) for item in payload.get("price_adjustments", [])]
         self._quote_sequence = int(payload.get("quote_sequence", 0))
 
     def _save(self) -> None:
@@ -99,6 +105,7 @@ class CommercialService:
                 for key, values in self._revisions.items()
             },
             "settings": self._settings.model_dump(mode="json"),
+            "price_adjustments": [item.model_dump(mode="json") for item in self._price_adjustments],
             "quote_sequence": self._quote_sequence,
         }
         self._storage_path.write_text(
@@ -166,6 +173,17 @@ class CommercialService:
             "four_to_five": self._settings.bend_time_4_to_5_pieces_minutes,
             "six_plus": self._settings.bend_time_6_plus_pieces_minutes,
         }
+
+    def create_price_adjustment(self, data: PriceAdjustmentCreate) -> PriceAdjustment:
+        self.get_client(data.client_id)
+        adjustment = PriceAdjustment(**data.model_dump())
+        with self._lock:
+            self._price_adjustments.append(adjustment)
+            self._save()
+        return adjustment.model_copy(deep=True)
+
+    def price_adjustments(self) -> list[PriceAdjustment]:
+        return [item.model_copy(deep=True) for item in reversed(self._price_adjustments)]
 
     def _calculate_item(
         self,
@@ -288,6 +306,7 @@ class CommercialService:
         if large_part_loss and calculation_source in {"administrativo", "estimativa_retangular"}:
             material_consumption *= 1 + self._settings.large_part_loss_percent / 100
         material_price = data.material_price_kg
+        selected = None
         if material_price is None and self._catalog_service is not None:
             candidates = self._catalog_service.list_materials(data.material, True)
             selected = next((item for item in candidates if (
@@ -308,7 +327,16 @@ class CommercialService:
         bend_additional_applied = False
         for process in data.processes:
             hourly_rate = process.hourly_rate
+            pricing_mode = process.pricing_mode
+            weight_rate = process.weight_rate
+            fixed_cost = process.fixed_cost
             process_name = process.name.casefold()
+            catalog_operation = next((item for item in (self._catalog_service.list_operations(True) if self._catalog_service else []) if item.name.casefold() == process_name), None)
+            if catalog_operation and not (hourly_rate or weight_rate or fixed_cost):
+                pricing_mode = catalog_operation.pricing_mode
+                hourly_rate = hourly_rate or catalog_operation.hourly_rate
+                weight_rate = weight_rate or catalog_operation.weight_rate
+                fixed_cost = fixed_cost or catalog_operation.fixed_cost
             if not hourly_rate:
                 if "corte" in process_name or "laser" in process_name:
                     hourly_rate = self._settings.default_cut_hourly_rate
@@ -316,16 +344,17 @@ class CommercialService:
                     hourly_rate = self._settings.default_bend_hourly_rate
                 elif "calandra" in process_name:
                     hourly_rate = self._settings.default_roll_hourly_rate
-            if process.pricing_mode.value == "peso":
-                cost = data.net_weight_kg * process.weight_rate
-            elif process.pricing_mode.value == "fixo":
-                cost = process.fixed_cost
+            if pricing_mode.value == "peso":
+                cost = data.net_weight_kg * weight_rate
+            elif pricing_mode.value == "fixo":
+                cost = fixed_cost
             else:
                 minutes = process.minutes
                 if "laser" in process_name or "corte laser" in process_name:
                     if not laser_estimated_minutes and data.cut_length_mm:
+                        laser_speed = selected.laser_speed_mm_min if selected and selected.laser_speed_mm_min else self._settings.default_laser_cutting_speed_mm_min
                         laser_estimated_minutes = (
-                            data.cut_length_mm / self._settings.default_laser_cutting_speed_mm_min
+                            data.cut_length_mm / laser_speed
                             + data.piercings * self._settings.default_laser_piercing_seconds / 60
                         )
                     if laser_estimated_minutes:
@@ -577,6 +606,35 @@ class CommercialService:
     def revisions(self, quote_id: UUID) -> list[QuoteRevision]:
         self.get_quote(quote_id)
         return [item.model_copy(deep=True) for item in self._revisions.get(quote_id, [])]
+
+    def register_invoice(self, quote_id: UUID, quantities: dict[UUID, float]) -> Quote:
+        current = self.get_quote(quote_id)
+        if current.status not in {QuoteStatus.APPROVED, QuoteStatus.PARTIALLY_INVOICED}:
+            raise CommercialValidationError("o orçamento não possui saldo disponível para faturamento")
+        accumulated = dict(current.invoiced_quantities)
+        for item_id, quantity in quantities.items():
+            item = next((row for row in current.items if row.id == item_id), None)
+            if item is None:
+                raise CommercialValidationError(f"item {item_id} não pertence ao orçamento")
+            previous = accumulated.get(str(item_id), 0)
+            if quantity <= 0 or previous + quantity > item.quantity + 1e-6:
+                raise CommercialValidationError(f"quantidade inválida para o item {item.code}")
+            accumulated[str(item_id)] = round(previous + quantity, 6)
+        complete = all(accumulated.get(str(item.id), 0) >= item.quantity - 1e-6 for item in current.items)
+        status = QuoteStatus.INVOICED if complete else QuoteStatus.PARTIALLY_INVOICED
+        updated = current.model_copy(update={
+            "invoiced_quantities": accumulated, "invoice_count": current.invoice_count + 1,
+            "status": status, "updated_at": datetime.now(timezone.utc),
+        })
+        with self._lock:
+            self._quotes[quote_id] = updated
+            self._revisions.setdefault(quote_id, []).append(QuoteRevision(
+                quote_id=quote_id, revision=current.revision,
+                reason=f"Faturamento {'total' if complete else 'parcial'} #{updated.invoice_count}",
+                snapshot=current.model_dump(mode="json"),
+            ))
+            self._save()
+        return updated.model_copy(deep=True)
 
     def submit_customer_proposal(self, quote_id: UUID, data: CustomerProposalCreate) -> Quote:
         current = self.get_quote(quote_id)

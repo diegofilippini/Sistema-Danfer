@@ -12,6 +12,12 @@ let lastDxfDrafts = [];
 let quoteMaterialCatalog = [];
 let routingTemplates = [];
 let bendTimeSettings = {one:10,two:5,three:4,four_to_five:3,six_plus:2.5};
+let priceTableSession = null;
+let quoteSaveMode = "manual";
+let quoteDirectoryHandle = null;
+let selectedProductionOrders = new Set();
+let selectedInvoiceQuotes = new Set();
+let invoiceReadyByQuote = new Map();
 let editingQuoteItemIndex = null;
 let currentUser = null;
 const accessModules = {
@@ -29,6 +35,7 @@ const roleAccess = {
   engenharia:["dashboard","library","engineering","bom","coordination"],
   producao:["dashboard","pcp","quality","maintenance","coordination"],
   qualidade:["dashboard","quality","quality-dashboard","deviations","coordination"],
+  analista_custos:["dashboard","pcp","engineering","library","deviations","monthly-analysis"],
   consulta:["dashboard","library","management-dashboard"]
 };
 
@@ -78,6 +85,13 @@ function pill(value) {
 }
 
 async function dashboard() {
+  if(currentUser?.role==="analista_custos"){
+    const [industrial,directRequests]=await Promise.all([req("/dashboard/industrial"),req("/pcp/direct-requests")]);
+    $("#metrics").innerHTML=[["Pedidos manuais",directRequests.length],["Ordens",industrial.production_orders],["Atrasadas",industrial.overdue_orders]].map(([label,value])=>`<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
+    $("#orders").innerHTML=table(["OP","Prazo","Prior.","Status"],industrial.next_orders.map(order=>`<tr><td><b>${esc(order.number)}</b></td><td>${order.due_date}</td><td>${order.priority}</td><td>${pill(order.status)}</td></tr>`));
+    $("#materials").innerHTML=table(["Material","Esp.","Qtd."],industrial.material_demand.map(item=>`<tr><td>${esc(item.material||"Não informado")}</td><td>${item.thickness_mm??"—"}</td><td><b>${item.total_quantity}</b></td></tr>`));
+    return;
+  }
   const [industrial, quotes, clients, quality] = await Promise.all([
     req("/dashboard/industrial"),
     req("/commercial/quotes"),
@@ -112,18 +126,31 @@ async function dashboard() {
 
 async function crm(query = "") {
   ensureCrmOpportunities();
-  const [clients, opportunities, alerts] = await Promise.all([req("/commercial/clients" + (query ? `?q=${encodeURIComponent(query)}` : "")), req("/crm/opportunities" + (query ? `?q=${encodeURIComponent(query)}` : "")), req("/crm/alerts")]);
+  const [clients, opportunities, alerts, productionProgress] = await Promise.all([req("/commercial/clients" + (query ? `?q=${encodeURIComponent(query)}` : "")), req("/crm/opportunities" + (query ? `?q=${encodeURIComponent(query)}` : "")), req("/crm/alerts"), req("/workflows/production-progress")]);
+  const progressByClient=new Map(productionProgress.map(item=>[item.client.toLocaleLowerCase("pt-BR"),item]));
   $("#clients").innerHTML = table(
-    ["Cliente","CNPJ / CPF","Contato","Condição","Frete","Status"],
-    clients.map(client =>
-      `<tr><td><b>${esc(client.name)}</b><br><small>${esc(client.email)}</small></td><td>${esc(client.document || "—")}</td><td>${esc(client.contact || "—")}<br><small>${esc(client.phone)}</small></td><td>${esc(client.payment_terms)}</td><td>${client.freight_type} · ${client.freight_payer}</td><td>${pill(client.active ? "ativo" : "inativo")}</td></tr>`
-    )
+    ["Cliente","Código ERP","CNPJ / CPF","Contato","Condição","Frete","Produção","Status"],
+    clients.map(client => {const progress=progressByClient.get(client.name.toLocaleLowerCase("pt-BR"))||{completed:0,total:0,percent:0};return `<tr><td><b>${esc(client.name)}</b><br><small>${esc(client.email)}</small></td><td><b>${esc(client.erp_code || "—")}</b></td><td>${esc(client.document || "—")}</td><td>${esc(client.contact || "—")}<br><small>${esc(client.phone)}</small></td><td>${esc(client.payment_terms)}</td><td>${client.freight_type} · ${client.freight_payer}</td><td>${productionProgressChart(progress)}</td><td>${pill(client.active ? "ativo" : "inativo")}</td></tr>`;
+    })
   );
+  await loadDeliveryBoard();
 }
+
+async function loadDeliveryBoard(){const days=Number($("#delivery-board-period")?.value||7),data=await req(`/dashboard/deliveries?days=${days}`);const root=$("#delivery-board");root.dataset.days=String(days);root.innerHTML=`<div class="delivery-board-grid">${data.columns.map(column=>`<section class="delivery-day ${column.status}"><header><b>${esc(column.label)}</b><small>${esc(column.weekday||"")}</small></header><ol>${column.clients.map(item=>`<li><span>${esc(item.client)}</span><b>${item.total} OP${item.total===1?"":"s"}</b><small>${esc(item.orders.join(", "))}</small></li>`).join("")||"<li class='empty-day'>Sem entregas</li>"}</ol></section>`).join("")}</div>`;return data;}
+$("#refresh-delivery-board").onclick=loadDeliveryBoard;
+$("#delivery-board-period").onchange=loadDeliveryBoard;
+$("#print-delivery-board").onclick=()=>{document.body.classList.add("print-delivery-board");window.print();setTimeout(()=>document.body.classList.remove("print-delivery-board"),500);};
+$("#push-delivery-board").onclick=async()=>{const username=prompt("Usuário destinatário (deixe vazio para enviar a todos):","");if(username===null)return;const data=await loadDeliveryBoard(),overdue=data.columns[0].clients.reduce((sum,item)=>sum+item.total,0),today=data.columns[1].clients.reduce((sum,item)=>sum+item.total,0);await req("/notifications",{method:"POST",body:JSON.stringify({title:`Painel de entregas - ${data.days} dias`,message:`${overdue} OP(s) atrasada(s), ${today} entrega(s) para hoje. Abra o Painel do Dia para consultar clientes e datas.`,audience:username?"usuario":"todos",recipient_username:username})});alert(`Painel enviado${username?` para ${username}`:" para todos os usuários"}.`);};
+function productionProgressChart(item){const color=item.percent<=20?"red":item.percent<70?"yellow":"green";return `<div class="production-progress ${color}" title="${item.completed} OP(s) concluída(s) de ${item.total}"><div><span style="width:${item.percent}%"></span></div><b>${item.percent}%</b><small>${item.completed} de ${item.total} OPs</small></div>`;}
 
 async function quotes() {
   const filter = $("#quote-filter").value;
-  const items = await req("/commercial/quotes" + (filter ? `?status=${filter}` : ""));
+  const [items, clients, invoiceReady] = await Promise.all([
+    req("/commercial/quotes" + (filter ? `?status=${filter}` : "")),
+    req("/commercial/clients"), req("/workflows/invoice-ready")
+  ]);
+  const clientsById = new Map(clients.map(client => [client.id, client]));
+  invoiceReadyByQuote = new Map(invoiceReady.map(item => [item.quote_id, item]));
   const totals = [
     ["Quantidade", items.length],
     ["Valor total", money(items.reduce((sum, quote) => sum + quote.total, 0))],
@@ -135,9 +162,8 @@ async function quotes() {
   ).join("");
   $("#quotes-table").innerHTML = table(
     ["Orçamento","Cliente","Tipo","Revisão","Total","Status","Ações"],
-    items.map(quote =>
-      `<tr><td><b>${esc(quote.number)}</b><br><small>${new Date(quote.created_at).toLocaleDateString("pt-BR")}</small></td><td><code>${quote.client_id.slice(0, 8)}</code></td><td>${esc(quote.type)}</td><td>${esc(quote.revision)}</td><td><b>${money(quote.total)}</b><br><small>Margem efetiva: ${Number(quote.effective_margin_percent||0).toFixed(2)}%</small></td><td>${pill(quote.status)}</td><td>${quoteActions(quote)}</td></tr>`
-    )
+    items.map(quote => {const client=clientsById.get(quote.client_id);return `<tr><td><b>${esc(quote.number)}</b><br><small>${new Date(quote.created_at).toLocaleDateString("pt-BR")}</small></td><td><b>${esc(client?.name||"Cliente não encontrado")}</b><br><small>ERP ${esc(client?.erp_code||"não informado")}</small></td><td>${esc(quote.type)}</td><td>${esc(quote.revision)}</td><td><b>${money(quote.total)}</b><br><small>Margem efetiva: ${Number(quote.effective_margin_percent||0).toFixed(2)}%</small></td><td>${pill(quote.status)}</td><td>${quoteActions(quote)}</td></tr>`;
+    })
   );
 }
 
@@ -147,7 +173,8 @@ window.moveQuote = async (id, status) => {
       method: "POST", body: JSON.stringify({status})
     });
     if (status === "aprovado") {
-      await req(`/workflows/quotes/${id}/erp-order`, {method:"POST"});
+      const [,orders]=await Promise.all([req(`/workflows/quotes/${id}/erp-order`, {method:"POST"}),req(`/workflows/quotes/${id}/production-orders`, {method:"POST"})]);
+      alert(`${orders.length} OP(s) gerada(s) conforme espessura e roteiro.`);
     }
     await quotes();
   } catch (error) {
@@ -177,7 +204,8 @@ async function bom() {
 }
 
 async function pcp() {
-  const [orders, directRequests] = await Promise.all([req("/pcp/orders"), req("/pcp/direct-requests")]);
+  const [orders, directRequests, invoiceReady] = await Promise.all([req("/pcp/orders"), req("/pcp/direct-requests"), currentUser?.role==="analista_custos"?Promise.resolve([]):req("/workflows/invoice-ready")]);
+  invoiceReadyByQuote = new Map(invoiceReady.map(item => [item.quote_id, item]));
   ensurePcpConsolidation();
   const groups = [
     ["planejada","Planejadas"],["liberada","Liberadas"],
@@ -199,13 +227,22 @@ async function pcp() {
     costs.map(item => `<tr><td><b>${esc(item.order_number)}</b></td><td>${money(item.estimated_total_cost)}</td><td>${money(item.actual_total_cost)}</td><td>${money(item.variance_value)}</td><td>${item.variance_percent == null ? "—" : item.variance_percent + "%"}</td></tr>`)
   );
   $("#direct-request-table").innerHTML = table(
-    ["SolicitaÃ§Ã£o","Cliente","DescriÃ§Ã£o","Processos","Prazo","Prioridade","Status"],
-    directRequests.map(item => `<tr><td><b>${esc(item.number)}</b></td><td>${esc(item.client)}</td><td>${esc(item.description)}</td><td>${item.processes.map(esc).join(" â†’ ")}</td><td>${item.due_date}</td><td>${item.priority}</td><td>${pill(item.status)}</td></tr>`)
+    ["Pedido manual","Cliente / ERP","Itens","Processos","Valor","Prazo","Responsável","Status"],
+    directRequests.map(item => `<tr><td><b>${esc(item.number)}</b><br><small>${esc(item.customer_order_number||"Sem pedido do cliente")}</small></td><td>${esc(item.client)}<br><small>ERP ${esc(item.customer_erp_code||"não informado")}</small></td><td>${item.items?.length||0}<br><small>${(item.items||[]).map(row=>`${esc(row.code)} · ${row.quantity} ${esc(row.unit)}`).join("<br>")||esc(item.description)}</small></td><td>${item.processes.map(esc).join(" → ")}</td><td>${money(item.total_value)}</td><td>${item.due_date}</td><td>${esc(item.requested_by||"—")}</td><td>${pill(item.status)}</td></tr>`)
   );
-  $("#op-archive-table").innerHTML = table(
-    ["OP","Prazo","Prioridade","Quantidade","Status","AÃ§Ã£o"],
-    orders.map(order => `<tr><td><b>${esc(order.number)}</b></td><td>${order.due_date}</td><td>${order.priority}</td><td>${order.quantity}</td><td>${pill(order.status)}</td><td>${nextOrderAction(order)}</td></tr>`)
+  selectedProductionOrders=new Set([...selectedProductionOrders].filter(id=>orders.some(order=>order.id===id)));
+  $("#op-archive-table").innerHTML = `<div class="toolbar"><label><input id="select-all-ops" type="checkbox"> Selecionar todas</label><button id="print-selected-ops" type="button">Imprimir OPs selecionadas</button></div>`+table(
+    ["Selecionar","OP","Prazo","Prioridade","Quantidade","Status","AÃ§Ã£o"],
+    orders.map(order => `<tr><td><input class="op-selection" type="checkbox" value="${order.id}" ${selectedProductionOrders.has(order.id)?"checked":""}></td><td><b>${esc(order.number)}</b></td><td>${order.due_date}</td><td>${order.priority}</td><td>${order.quantity}</td><td>${pill(order.status)}</td><td><button class="action" onclick="printProductionOrders(['${order.id}'])">Imprimir OP</button> ${nextOrderAction(order)}</td></tr>`)
   );
+  document.querySelectorAll(".op-selection").forEach(input=>input.onchange=()=>{input.checked?selectedProductionOrders.add(input.value):selectedProductionOrders.delete(input.value);});
+  $("#select-all-ops").onchange=event=>{document.querySelectorAll(".op-selection").forEach(input=>{input.checked=event.target.checked;input.checked?selectedProductionOrders.add(input.value):selectedProductionOrders.delete(input.value);});};
+  $("#print-selected-ops").onclick=()=>{if(!selectedProductionOrders.size)return alert("Selecione pelo menos uma OP.");printProductionOrders([...selectedProductionOrders]);};
+  selectedInvoiceQuotes=new Set([...selectedInvoiceQuotes].filter(id=>invoiceReady.some(item=>item.quote_id===id&&item.ready)));
+  $("#invoice-release-table").innerHTML=`<div class="toolbar"><label><input id="select-all-invoices" type="checkbox"> Selecionar todos com saldo produzido</label><button id="invoice-selected" type="button">Enviar saldos produzidos selecionados para o ERP</button></div>`+table(["Selecionar","Orçamento","Cliente / ERP","OPs concluídas","Faturamento","Status","Ação"],invoiceReady.map(item=>`<tr><td><input class="invoice-selection" type="checkbox" value="${item.quote_id}" ${item.ready?"":"disabled"} ${selectedInvoiceQuotes.has(item.quote_id)?"checked":""}></td><td><b>${esc(item.quote_number)}</b></td><td>${esc(item.client)}<br><small>ERP ${esc(item.erp_customer_code||"não informado")}</small></td><td>${item.completed}/${item.orders}</td><td>${money(item.invoiced_total)} faturado<br><small>${money(item.remaining_total)} restante</small></td><td>${pill(item.status)}</td><td>${item.ready?`<button class="action" onclick="invoiceQuote('${item.quote_id}')">Selecionar itens</button>`:"—"}</td></tr>`));
+  document.querySelectorAll(".invoice-selection").forEach(input=>input.onchange=()=>{input.checked?selectedInvoiceQuotes.add(input.value):selectedInvoiceQuotes.delete(input.value);});
+  $("#select-all-invoices").onchange=event=>document.querySelectorAll(".invoice-selection:not(:disabled)").forEach(input=>{input.checked=event.target.checked;input.checked?selectedInvoiceQuotes.add(input.value):selectedInvoiceQuotes.delete(input.value);});
+  $("#invoice-selected").onclick=async()=>{if(!selectedInvoiceQuotes.size)return alert("Selecione ao menos um orçamento pronto.");try{await req("/workflows/invoice-batch",{method:"POST",body:JSON.stringify({quote_ids:[...selectedInvoiceQuotes]})});selectedInvoiceQuotes.clear();alert("Orçamentos enviados ao faturamento e marcados como faturados.");await pcp();}catch(error){alert(error.message);}};
   const active = orders.filter(item => !["concluida","cancelada"].includes(item.status));
   $("#operational-flow").innerHTML = [
     ["Pedidos diretos", directRequests.filter(item => item.status !== "concluida").length],
@@ -225,17 +262,21 @@ function quoteActions(quote){
     actions+=proposal?`<small>Cliente: ${money(proposal.proposed_total)} · margem ${Number(proposal.effective_margin_percent).toFixed(2)}%</small> `:"";
     if(proposal&&currentUser?.role==="administrador")actions+=`<button class="action" onclick="decideCustomerProposal('${quote.id}','${proposal.id}',true)">Autorizar</button> <button class="action" onclick="decideCustomerProposal('${quote.id}','${proposal.id}',false)">Recusar</button>`;
   }
+  if(quote.status==="aprovado")actions+=`<button class="action" onclick="generateProductionOrders('${quote.id}')">Gerar / consultar OPs</button>`;
+  if(invoiceReadyByQuote.get(quote.id)?.ready)actions+=` <button class="action" onclick="invoiceQuote('${quote.id}')">Enviar para faturamento</button>`;
+  if(quote.status==="faturado")actions+=` <small>Faturamento já enviado</small>`;
   return actions;
 }
+window.generateProductionOrders=async id=>{try{const orders=await req(`/workflows/quotes/${id}/production-orders`,{method:"POST"});alert(orders.length?`OPs vinculadas: ${orders.map(item=>item.number).join(", ")}`:"Nenhuma OP gerada. Confira os cadastros técnicos e BOMs.");}catch(error){alert(error.message);}};
 window.customerProposal=async(id,currentTotal)=>{const value=Number(prompt(`Valor original: ${money(currentTotal)}\nProposta do cliente (R$):`,String(currentTotal)));if(!value||value>=currentTotal)return alert("Informe um valor menor que o orçamento atual.");const notes=prompt("Observação da negociação:","")||"";try{const updated=await req(`/commercial/quotes/${id}/customer-proposals`,{method:"POST",body:JSON.stringify({proposed_total:value,submitted_by:currentUser?.name||"",notes})});const proposal=updated.customer_proposals.at(-1);alert(`Proposta registrada.\nMargem efetiva: ${proposal.effective_margin_percent.toFixed(2)}%\nMargem mínima: ${proposal.minimum_margin_percent.toFixed(2)}%\nAguardando autorização administrativa.`);await quotes();}catch(error){alert(error.message);}};
-window.decideCustomerProposal=async(quoteId,proposalId,approved)=>{const reason=prompt(approved?"Justificativa da autorização:":"Motivo da recusa:");if(!reason)return;try{await req(`/commercial/quotes/${quoteId}/customer-proposals/${proposalId}/decision`,{method:"POST",body:JSON.stringify({approved,decided_by:currentUser?.name||"",reason})});await quotes();}catch(error){alert(error.message);}};
+window.decideCustomerProposal=async(quoteId,proposalId,approved)=>{const reason=prompt(approved?"Justificativa da autorização:":"Motivo da recusa:");if(!reason)return;try{await req(`/commercial/quotes/${quoteId}/customer-proposals/${proposalId}/decision`,{method:"POST",body:JSON.stringify({approved,decided_by:currentUser?.name||"",reason})});if(approved)await Promise.all([req(`/workflows/quotes/${quoteId}/erp-order`,{method:"POST"}),req(`/workflows/quotes/${quoteId}/production-orders`,{method:"POST"})]);await quotes();}catch(error){alert(error.message);}};
 
 function ensurePcpConsolidation() {
   if ($("#pcp-consolidated")) return;
   const root = $("#pcp");
   const block = document.createElement("div");
   block.id = "pcp-consolidated";
-  block.innerHTML = `<div id="operational-flow" class="metrics compact"></div><article><div class="toolbar"><h2>Pedidos diretos (SP)</h2><button id="new-direct-request">+ Pedido direto</button></div><div id="direct-request-table"></div></article><article><h2>Arquivo e liberaÃ§Ã£o de OPs</h2><div id="op-archive-table"></div></article>`;
+  block.innerHTML = `<div id="operational-flow" class="metrics compact"></div><article><div class="toolbar"><div><h2>Pedidos manuais sem orçamento</h2><small>Entrada direta pelo analista de custos, com rastreabilidade própria.</small></div><button id="new-direct-request">+ Pedido manual</button></div><div id="direct-request-table"></div></article><article><h2>Arquivo e liberaÃ§Ã£o de OPs</h2><div id="op-archive-table"></div></article><article><h2>Liberação para faturamento</h2><p class="muted">Somente orçamentos com todas as OPs concluídas podem ser selecionados.</p><div id="invoice-release-table"></div></article>`;
   root.appendChild(block);
   $("#new-direct-request").onclick = createDirectRequest;
 }
@@ -245,19 +286,19 @@ function nextOrderAction(order) {
   return next ? `<button class="action" onclick="moveProductionOrder('${order.id}','${next}')">${{liberada:"Liberar",em_producao:"Iniciar",concluida:"Concluir"}[next] || "Retomar"}</button>` : "";
 }
 
+window.printProductionOrders=ids=>{const query=ids.map(id=>`ids=${encodeURIComponent(id)}`).join("&");window.open(`${api}/pcp/orders-print.pdf?${query}`,"_blank","noopener");};
+
 window.moveProductionOrder = async (id, status) => {
   await req(`/pcp/orders/${id}`, {method:"PATCH", body:JSON.stringify({status})});
   await pcp();
 };
+window.invoiceQuote=async id=>{const info=invoiceReadyByQuote.get(id)||await req("/workflows/invoice-ready").then(rows=>rows.find(item=>item.quote_id===id));if(!info)return alert("Orçamento não encontrado para faturamento.");const items=[];for(const item of info.items.filter(row=>row.eligible_quantity>0)){const value=prompt(`${item.code} · ${item.description}\nPedido: ${item.quantity} ${item.unit}\nJá faturado: ${item.invoiced_quantity}\nDisponível produzido: ${item.eligible_quantity}\n\nQuantidade para esta remessa (0 para não enviar):`,String(item.eligible_quantity));if(value===null)return;const quantity=Number(String(value).replace(",","."));if(quantity<0||quantity>item.eligible_quantity)return alert(`Quantidade inválida para ${item.code}.`);if(quantity>0)items.push({item_id:item.item_id,quantity});}if(!items.length)return alert("Nenhum item foi selecionado.");try{await req(`/workflows/quotes/${id}/invoice`,{method:"POST",body:JSON.stringify({items})});alert("Itens enviados ao faturamento. O orçamento permanecerá como faturamento parcial enquanto houver saldo.");await Promise.all([pcp(),quotes()]);}catch(error){alert(error.message);}};
 
 async function createDirectRequest() {
-  const client = prompt("Cliente do pedido direto:"); if (!client) return;
-  const description = prompt("DescriÃ§Ã£o do serviÃ§o:"); if (!description) return;
-  const processes = (prompt("Processos separados por vÃ­rgula:", "Corte Laser, Dobra") || "").split(",").map(value => value.trim()).filter(Boolean); if (!processes.length) return;
-  const due_date = prompt("Prazo (AAAA-MM-DD):", new Date(Date.now() + 7 * 86400000).toISOString().slice(0,10)); if (!due_date) return;
-  await req("/pcp/direct-requests", {method:"POST", body:JSON.stringify({client, description, processes, due_date, priority:3})});
-  await pcp();
+  const form=$("#manual-order-form");form.reset();form.elements.due_date.value=new Date(Date.now()+7*86400000).toISOString().slice(0,10);$("#manual-order-dialog").showModal();
 }
+
+$("#manual-order-form").onsubmit=async event=>{event.preventDefault();const form=Object.fromEntries(new FormData(event.target));try{const items=form.items_text.split(/\r?\n/).filter(Boolean).map((line,index)=>{const [code,description,quantity,unit,material,thickness,unitPrice]=line.split(";").map(value=>value.trim());if(!code||!description||!(Number(String(quantity).replace(",","."))>0))throw Error(`Item ${index+1} inválido. Use o formato indicado.`);return{code,description,quantity:Number(String(quantity).replace(",",".")),unit:unit||"un",material:material||"",thickness_mm:thickness?Number(String(thickness).replace(",",".")):null,unit_price:unitPrice?Number(String(unitPrice).replace(",",".")):0};});if(!items.length)throw Error("Informe ao menos um item.");const payload={origin:"pedido_manual_sem_orcamento",client:form.client,customer_erp_code:form.customer_erp_code,contact:form.contact,customer_order_number:form.customer_order_number,description:form.description,processes:form.processes.split(",").map(value=>value.trim()).filter(Boolean),material:form.material,due_date:form.due_date,priority:Number(form.priority),billing_unit:form.billing_unit,reason:form.reason,items};await req("/pcp/direct-requests",{method:"POST",body:JSON.stringify(payload)});$("#manual-order-dialog").close();await pcp();alert("Pedido manual registrado sem geração de orçamento.");}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
 
 async function integrations() {
   const [orders, events] = await Promise.all([
@@ -325,12 +366,24 @@ function ensureAnalyticsSections() {
 function ensureGlobalTools(){
   if($("#global-search"))return;
   const header=document.querySelector("main > header"),tools=document.createElement("div");tools.className="global-tools";
-  tools.innerHTML=`<div class="global-search-wrap"><input id="global-search" placeholder="Pesquisar cliente, orÃ§amento, OP ou SP"><div id="global-search-results"></div></div><button id="enable-push" type="button">Ativar avisos</button><button id="notification-center" type="button">NotificaÃ§Ãµes</button>`;
+  tools.innerHTML=`<div class="global-search-wrap"><input id="global-search" placeholder="Pesquisar cliente, orÃ§amento, OP ou SP"><div id="global-search-results"></div></div><button id="print-current-view" type="button">Imprimir / PDF</button><button id="theme-toggle" type="button" aria-label="Alternar esquema de cores"></button><button id="enable-push" type="button">Ativar avisos</button><button id="notification-center" type="button">NotificaÃ§Ãµes</button>`;
   header.appendChild(tools);
-  let timer;$("#global-search").oninput=event=>{clearTimeout(timer);const q=event.target.value.trim();if(q.length<2){$("#global-search-results").innerHTML="";return}timer=setTimeout(async()=>{const data=await req(`/search?q=${encodeURIComponent(q)}`);$("#global-search-results").innerHTML=data.map(item=>`<button type="button"><b>${esc(item.type)} Â· ${esc(item.title)}</b><small>${esc(item.subtitle)}</small></button>`).join("")||"<small>Nenhum resultado.</small>";},250)};
+  let timer;$("#global-search").oninput=event=>{clearTimeout(timer);const q=event.target.value.trim();if(q.length<2){$("#global-search-results").innerHTML="";return}timer=setTimeout(async()=>{const data=await req(`/search?q=${encodeURIComponent(q)}`);$("#global-search-results").innerHTML=data.map(item=>`<button type="button" onclick="openGlobalSearchResult('${esc(item.type)}','${esc(item.title)}')"><b>${esc(item.type)} Â· ${esc(item.title)}</b><small>${esc(item.subtitle)}</small></button>`).join("")||"<small>Nenhum resultado.</small>";},250)};
   $("#notification-center").onclick=showNotifications;
+  $("#print-current-view").onclick=printCurrentView;
+  $("#theme-toggle").onclick=cycleTheme;
+  renderThemeButton();
   $("#enable-push").onclick=enablePushNotifications;
 }
+function printCurrentView(){const active=document.querySelector(".view.active"),title=active?.querySelector("h2")?.textContent||document.title,previous=document.title;document.title=`Danfer - ${title}`;window.print();setTimeout(()=>document.title=previous,500);}
+window.openGlobalSearchResult=async(type,title)=>{const view={cliente:"crm","orçamento":"quotes",OP:"pcp",SP:"pcp","solicitação":"coordination"}[type];if(!view)return;const button=document.querySelector(`nav button[data-view="${view}"]`);if(!button||button.hidden)return alert("Este módulo não está disponível para seu perfil.");await button.onclick();$("#global-search-results").innerHTML="";$("#global-search").value="";setTimeout(()=>{const rows=[...document.querySelectorAll(`#${view} tr`)];const row=rows.find(item=>item.textContent.includes(title));if(row){row.classList.add("search-hit");row.scrollIntoView({behavior:"smooth",block:"center"});setTimeout(()=>row.classList.remove("search-hit"),3000);}},100);};
+async function chooseQuoteDirectory(mode){if(!window.showDirectoryPicker)return null;alert(mode==="import"?"Selecione a mesma pasta dos desenhos importados para salvar o orçamento em PDF.":"Selecione a pasta onde este orçamento deverá ser salvo em PDF.");return window.showDirectoryPicker({id:mode==="import"?"imported-quotes":"manual-quotes",mode:"readwrite",startIn:"documents"});}
+async function saveQuotePdf(quote,directory){const response=await fetch(`${api}/commercial/quotes/${quote.id}/proposal.pdf`,{credentials:"same-origin"});if(!response.ok)throw Error("Não foi possível gerar o PDF do orçamento.");const blob=await response.blob(),filename=`${quote.number}.pdf`;if(directory){const file=await directory.getFileHandle(filename,{create:true}),writer=await file.createWritable();await writer.write(blob);await writer.close();return `PDF salvo em ${directory.name}\\${filename}`;}const link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);return `PDF enviado para Downloads como ${filename}`;}
+function resolveTheme(preference){return preference==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):preference;}
+function applyTheme(preference){const theme=resolveTheme(preference);document.documentElement.dataset.theme=theme;document.documentElement.dataset.themePreference=preference;localStorage.setItem("danfer-theme",preference);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=theme==="dark"?"#07131f":"#071a2e";renderThemeButton();}
+function renderThemeButton(){const button=$("#theme-toggle");if(!button)return;const preference=document.documentElement.dataset.themePreference||localStorage.getItem("danfer-theme")||"auto";const labels={auto:"◐ Automático",light:"☀ Claro",dark:"☾ Escuro"};button.textContent=labels[preference];button.title=`Tema atual: ${labels[preference]}. Clique para alternar.`;}
+function cycleTheme(){const current=document.documentElement.dataset.themePreference||"auto",order=["auto","light","dark"],next=order[(order.indexOf(current)+1)%order.length];applyTheme(next);}
+matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if((document.documentElement.dataset.themePreference||"auto")==="auto")applyTheme("auto");});
 async function showNotifications(){if(!currentUser)return;const data=await req(`/notifications?username=${encodeURIComponent(currentUser.username)}&role=${encodeURIComponent(currentUser.role)}`);alert(data.length?data.slice(0,12).map(item=>`${item.read?"":"â€¢ "}${item.title}\n${item.message}`).join("\n\n"):"Nenhuma notificaÃ§Ã£o.");await Promise.all(data.filter(item=>!item.read).map(item=>req(`/notifications/${item.id}/read`,{method:"POST"})));}
 function vapidKeyBytes(value){const padding="=".repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from(atob(base64),character=>character.charCodeAt(0));}
 async function enablePushNotifications(){
@@ -426,6 +479,10 @@ async function maintenance() {
       ["bend_time_3_pieces_minutes", "Dobra padrão — 3 peças (min/peça)"],
       ["bend_time_4_to_5_pieces_minutes", "Dobra padrão — 4 a 5 peças (min/peça)"],
       ["bend_time_6_plus_pieces_minutes", "Dobra sugerida — 6 ou mais (min/peça)"],
+      ["sale_industrialization_price_review_days", "Revisão — venda para industrialização (dias)"],
+      ["sale_consumption_price_review_days", "Revisão — venda para uso e consumo (dias)"],
+      ["industrialization_price_review_days", "Revisão — industrialização (dias)"],
+      ["third_party_material_price_review_days", "Revisão — material de terceiros (dias)"],
     ];
     const action = form.querySelector(".wide");
     nestingFields.forEach(([name, label]) => {
@@ -444,6 +501,10 @@ async function maintenance() {
       ["Roteiro", "Sequência", "Status"],
       routingTemplates.map(item => `<tr><td><b>${esc(item.name)}</b><br><small>${esc(item.description)}</small></td><td>${item.steps.map(step => `${step.operation_erp_code} · ${esc(step.process)} (${step.default_minutes} min)`).join(" → ")}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`)
     );
+    await renderOperationCostSettings();
+    await renderMaterialCostSettings();
+    await renderRecoveredMaintenance();
+    await renderPriceReviewCenter();
   }
   await renderUserAccess();
   ensureAdminSystemTools();
@@ -478,9 +539,15 @@ dialogControls("#new-quote", "#quote-dialog", ".close-quote");
 dialogControls("#new-quality", "#quality-dialog", ".close-quality");
 dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
 dialogControls("#new-material", "#material-dialog", ".close-material");
+dialogControls("#import-price-table", "#price-table-dialog", ".close-price-table");
 dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
+let pdfReturnToQuote=false;
+$("#new-pdf-drawing").onclick=()=>{pdfReturnToQuote=$("#quote-dialog").open;if(pdfReturnToQuote)$("#quote-dialog").close();$("#pdf-drawing-dialog").showModal();};
+document.querySelectorAll(".close-pdf-drawing").forEach(button=>button.onclick=()=>{$("#pdf-drawing-dialog").close();if(pdfReturnToQuote)$("#quote-dialog").showModal();});
 dialogControls("#new-nesting", "#nesting-dialog", ".close-nesting");
 dialogControls("#new-work-log", "#work-log-dialog", ".close-work-log");
+document.querySelectorAll(".close-manual-order").forEach(button=>button.onclick=()=>$("#manual-order-dialog").close());
+document.querySelectorAll(".close-invoiced-history").forEach(button=>button.onclick=()=>$("#invoiced-history-dialog").close());
 dialogControls("#new-request", "#request-dialog", ".close-request");
 dialogControls("#new-message", "#message-dialog", ".close-message");
 
@@ -515,6 +582,10 @@ $("#material-form").onsubmit = async event => {
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
+let analyzedPdfDrawing=null;
+$("#analyze-pdf-drawing").onclick=async()=>{const form=$("#pdf-drawing-form"),file=form.elements.pdf_file.files[0];if(!file)return form.querySelector(".dialog-error").textContent="Selecione um arquivo PDF.";try{const content=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]);reader.onerror=reject;reader.readAsDataURL(file);});analyzedPdfDrawing=await req("/engineering/pdf/analyze",{method:"POST",body:JSON.stringify({filename:file.name,content_base64:content})});if(analyzedPdfDrawing.width_mm)form.elements.width_mm.value=analyzedPdfDrawing.width_mm;if(analyzedPdfDrawing.height_mm)form.elements.height_mm.value=analyzedPdfDrawing.height_mm;if(!form.elements.description.value)form.elements.description.value=file.name.replace(/\.pdf$/i,"");$("#pdf-drawing-analysis").innerHTML=`<div class="notice"><b>${esc(analyzedPdfDrawing.source_type)} · ${analyzedPdfDrawing.page_count} página(s)</b><p>${analyzedPdfDrawing.dimensions.length?analyzedPdfDrawing.dimensions.map(item=>`${esc(item.kind)}: ${item.value_mm} mm (${item.confidence_percent}% confiança)`).join(" · "):"Nenhuma cota reconhecida automaticamente."}</p>${analyzedPdfDrawing.warnings.map(item=>`<small>⚠ ${esc(item)}</small>`).join("<br>")}</div>`;$("#use-pdf-drawing").disabled=false;form.querySelector(".dialog-error").textContent="";}catch(error){form.querySelector(".dialog-error").textContent=error.message;}};
+$("#pdf-drawing-form").onsubmit=async event=>{event.preventDefault();const form=Object.fromEntries(new FormData(event.target));if(!analyzedPdfDrawing)return event.target.querySelector(".dialog-error").textContent="Analise o PDF antes de aplicar.";try{const item=await req("/engineering/pdf/confirm-quote-item",{method:"POST",body:JSON.stringify({filename:analyzedPdfDrawing.filename,code:form.code,description:form.description,quantity:Number(form.quantity),material:form.material,thickness_mm:Number(form.thickness_mm),width_mm:Number(form.width_mm),height_mm:Number(form.height_mm),cut_length_mm:form.cut_length_mm?Number(form.cut_length_mm):null,confirmed:form.confirmed==="true"})});pendingQuoteItems.push({...item,margin_percent:30});$("#pdf-drawing-dialog").close();$("#quote-dialog").showModal();renderPendingQuoteItems();analyzedPdfDrawing=null;pdfReturnToQuote=false;event.target.reset();}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
+
 $("#dxf-form").onsubmit = async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.target));
@@ -548,10 +619,15 @@ function renderDxfDrafts() {
   ) : '<div class="empty">Importe arquivos DXF para preparar itens de orçamento.</div>';
   if ($("#use-dxf-drafts")) $("#use-dxf-drafts").onclick = () => {
     $("#new-quote").click();
+    quoteSaveMode = "import";
     pendingQuoteItems = lastDxfDrafts.map(item => ({...item, margin_percent:30}));
     renderPendingQuoteItems();
   };
 }
+
+async function renderOperationCostSettings(){let card=$("#operation-cost-settings-card");if(!card){card=document.createElement("article");card.id="operation-cost-settings-card";card.innerHTML=`<div class="toolbar"><div><h2>Centros de trabalho e valores por processo</h2><small>Valores administrativos aplicados automaticamente aos novos cálculos.</small></div></div><div id="operation-cost-settings"></div>`;$("#maintenance").insertBefore(card,$("#routing-settings-card"));}const operations=await req("/catalogs/operations");$("#operation-cost-settings").innerHTML=table(["ERP","Processo","Método","Valor","Unidade","Ação"],operations.map(item=>`<tr data-operation-code="${item.erp_code}"><td>${item.erp_code}</td><td><input data-operation-name value="${esc(item.name)}"></td><td><select data-operation-mode><option value="tempo" ${item.pricing_mode==="tempo"?"selected":""}>Tempo</option><option value="peso" ${item.pricing_mode==="peso"?"selected":""}>Peso</option><option value="fixo" ${item.pricing_mode==="fixo"?"selected":""}>Fixo</option></select></td><td><input data-operation-rate type="number" min="0" step=".01" value="${item.pricing_mode==="peso"?item.weight_rate:item.pricing_mode==="fixo"?item.fixed_cost:item.hourly_rate}"></td><td data-operation-unit>${item.pricing_mode==="peso"?"R$/kg":item.pricing_mode==="fixo"?"R$/operação":"R$/h"}</td><td><button type="button" data-save-operation>Salvar</button></td></tr>`));document.querySelectorAll("[data-operation-mode]").forEach(select=>select.onchange=()=>{select.closest("tr").querySelector("[data-operation-unit]").textContent=select.value==="peso"?"R$/kg":select.value==="fixo"?"R$/operação":"R$/h";});document.querySelectorAll("[data-save-operation]").forEach(button=>button.onclick=async()=>{const row=button.closest("tr"),mode=row.querySelector("[data-operation-mode]").value,rate=Number(row.querySelector("[data-operation-rate]").value),payload={name:row.querySelector("[data-operation-name]").value,pricing_mode:mode,hourly_rate:mode==="tempo"?rate:0,weight_rate:mode==="peso"?rate:0,fixed_cost:mode==="fixo"?rate:0};await req(`/catalogs/operations/${row.dataset.operationCode}`,{method:"PATCH",body:JSON.stringify(payload)});button.textContent="Salvo";setTimeout(()=>button.textContent="Salvar",1200);});}
+
+async function renderMaterialCostSettings(){let card=$("#material-cost-settings-card");if(!card){card=document.createElement("article");card.id="material-cost-settings-card";card.innerHTML=`<div class="toolbar"><div><h2>Materiais e parâmetros de corte</h2><small>Preço, densidade e velocidades configuráveis por espessura.</small></div><div><button id="add-material-setting" type="button">+ Adicionar linha</button> <button id="export-material-settings" type="button">Exportar CSV</button></div></div><div id="material-cost-settings" class="wide-admin-table"></div>`;$("#maintenance").insertBefore(card,$("#operation-cost-settings-card"));}const materials=await req("/catalogs/materials");const row=item=>`<tr data-material-id="${item.id||""}"><td><input data-mat-description value="${esc(item.description||"")}" placeholder="Material"></td><td><input data-mat-thickness type="number" min=".01" step=".01" value="${item.thickness_mm||""}"></td><td><input data-mat-density type="number" min="1" step="1" value="${item.density_kg_m3||7850}"></td><td><input data-mat-price type="number" min="0" step=".01" value="${item.price_per_kg??""}"></td><td><input data-mat-laser type="number" min="0" step=".1" value="${item.laser_speed_mm_min||0}"></td><td><input data-mat-plasma type="number" min="0" step=".1" value="${item.plasma_speed_mm_min||0}"></td><td><input data-mat-spec value="${esc(item.specification||"")}"></td><td><input data-mat-erp value="${esc(item.erp_code||"")}" placeholder="ERP"></td><td><label><input data-mat-active type="checkbox" ${item.active!==false?"checked":""}> Ativo</label></td><td><button type="button" data-save-material>${item.id?"Salvar":"Criar"}</button> ${item.id?'<button type="button" class="cancel" data-delete-material>Excluir</button>':""}</td></tr>`;const render=()=>{$("#material-cost-settings").innerHTML=table(["Material","Esp. mm","Densidade kg/m³","R$/kg","Laser mm/min","Plasma mm/min","Especificação","ERP","Status","Ações"],materials.map(row));bind();};const payload=current=>({erp_code:current.querySelector("[data-mat-erp]").value,description:current.querySelector("[data-mat-description]").value,specification:current.querySelector("[data-mat-spec]").value,thickness_mm:Number(current.querySelector("[data-mat-thickness]").value),price_per_kg:Number(current.querySelector("[data-mat-price]").value),density_kg_m3:Number(current.querySelector("[data-mat-density]").value),laser_speed_mm_min:Number(current.querySelector("[data-mat-laser]").value),plasma_speed_mm_min:Number(current.querySelector("[data-mat-plasma]").value),active:current.querySelector("[data-mat-active]").checked});const bind=()=>{document.querySelectorAll("[data-save-material]").forEach(button=>button.onclick=async()=>{const current=button.closest("tr"),id=current.dataset.materialId;await req(id?`/catalogs/materials/${id}`:"/catalogs/materials",{method:id?"PATCH":"POST",body:JSON.stringify(payload(current))});await renderMaterialCostSettings();});document.querySelectorAll("[data-delete-material]").forEach(button=>button.onclick=async()=>{if(!confirm("Excluir este material da tabela?"))return;await req(`/catalogs/materials/${button.closest("tr").dataset.materialId}`,{method:"DELETE"});await renderMaterialCostSettings();});};render();$("#add-material-setting").onclick=()=>{materials.push({id:"",density_kg_m3:7850,active:true,laser_speed_mm_min:0,plasma_speed_mm_min:0});render();};$("#export-material-settings").onclick=()=>{const headers=["ERP","Material","Especificação","Espessura mm","Densidade kg/m3","Preço kg","Laser mm/min","Plasma mm/min","Ativo"],lines=[headers,...materials.filter(item=>item.id).map(item=>[item.erp_code,item.description,item.specification,item.thickness_mm,item.density_kg_m3,item.price_per_kg,item.laser_speed_mm_min,item.plasma_speed_mm_min,item.active?"sim":"não"])],blob=new Blob([lines.map(values=>values.map(value=>`"${String(value??"").replaceAll('"','""')}"`).join(";")).join("\n")],{type:"text/csv;charset=utf-8"}),link=document.createElement("a");link.href=URL.createObjectURL(blob);link.download="materiais-danfer.csv";link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000);};}
 
 async function renderCrmAlertSettings() {
   let card = $("#crm-alert-settings-card");
@@ -603,6 +679,8 @@ $("#client-form").onsubmit = async event => {
 };
 
 $("#new-quote").addEventListener("click", async () => {
+  quoteSaveMode = "manual";
+  quoteDirectoryHandle = null;
   pendingQuoteItems = [];
   editingQuoteItemIndex = null;
   renderPendingQuoteItems();
@@ -615,7 +693,7 @@ $("#new-quote").addEventListener("click", async () => {
   bendTimeSettings = bendTimes;
   $("#quote-material-options").innerHTML = materials.map(item => `<option value="${esc(item.description)}">${esc(item.erp_code)} · ${item.thickness_mm} mm</option>`).join("");
   $("#quote-client").innerHTML = clients.map(client =>
-    `<option value="${client.id}">${esc(client.name)}</option>`
+    `<option value="${client.id}">${client.erp_code ? esc(client.erp_code) + " — " : ""}${esc(client.name)}</option>`
   ).join("");
   $("#quote-routing-template").innerHTML = '<option value="">Selecionar roteiro…</option>' + templates.map(template => `<option value="${template.id}">${esc(template.name)}</option>`).join("");
   const validity = new Date(); validity.setDate(validity.getDate() + 10);
@@ -661,11 +739,17 @@ function quoteItemFromForm(form) {
 }
 
 async function engineering() {
-  const [materials, operations] = await Promise.all([req("/catalogs/materials"), req("/catalogs/operations")]);
+  const [materials, operations, priceHistory] = await Promise.all([req("/catalogs/materials"), req("/catalogs/operations"), req("/catalogs/materials/price-table/history")]);
   $("#material-catalog").innerHTML = table(["ERP","Material","Esp.","Preço/kg","Status"], materials.map(item => `<tr><td><b>${esc(item.erp_code)}</b></td><td>${esc(item.description)}<br><small>${esc(item.specification)}</small></td><td>${item.thickness_mm} mm</td><td>${money(item.price_per_kg)}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`));
   $("#operation-catalog").innerHTML = table(["Código","Operação","Custeio","Valor hora"], operations.map(item => `<tr><td><b>${item.erp_code}</b></td><td>${esc(item.name)}</td><td>${esc(item.pricing_mode)}</td><td>${money(item.hourly_rate)}</td></tr>`));
+  $("#price-import-history").innerHTML = table(["Data","Arquivo","Criados","Atualizados","Sem alteração","Inválidos","Usuário"], priceHistory.map(item=>`<tr><td>${new Date(item.imported_at).toLocaleString("pt-BR")}</td><td><b>${esc(item.filename)}</b></td><td>${item.created}</td><td>${item.updated}</td><td>${item.unchanged}</td><td>${item.invalid}</td><td>${esc(item.imported_by||"—")}</td></tr>`));
   renderDxfDrafts();
 }
+
+function fileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",",2)[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file);});}
+function guessPriceColumn(columns,terms){return columns.find(column=>terms.some(term=>column.toLocaleLowerCase("pt-BR").includes(term)))||"";}
+$("#preview-price-table").onclick=async()=>{const form=$("#price-table-form"),file=form.elements.price_file.files[0];if(!file)return alert("Selecione a tabela de preços.");try{const preview=await req("/catalogs/materials/price-table/preview",{method:"POST",body:JSON.stringify({filename:file.name,content_base64:await fileBase64(file),header_row:Number(form.elements.header_row.value||1)})});priceTableSession=preview.session_id;const optional='<option value="">Não utilizar</option>',options=preview.columns.map(column=>`<option value="${esc(column)}">${esc(column)}</option>`).join("");["erp_code_column","price_column"].forEach(name=>form.elements[name].innerHTML=options);["description_column","thickness_column","specification_column","density_column"].forEach(name=>form.elements[name].innerHTML=optional+options);form.elements.erp_code_column.value=guessPriceColumn(preview.columns,["erp","codigo","código","cod."]);form.elements.price_column.value=guessPriceColumn(preview.columns,["preço","preco","price","valor"]);form.elements.description_column.value=guessPriceColumn(preview.columns,["descrição","descricao","material","produto"]);form.elements.thickness_column.value=guessPriceColumn(preview.columns,["espessura","thickness","mm"]);form.elements.specification_column.value=guessPriceColumn(preview.columns,["especificação","especificacao","spec"]);form.elements.density_column.value=guessPriceColumn(preview.columns,["densidade","density"]);$("#price-table-preview").innerHTML=`<p><b>${preview.total_rows}</b> linhas encontradas. Confira o mapeamento antes de gravar.</p>${table(preview.columns,preview.rows.slice(0,8).map(row=>`<tr>${row.map(cell=>`<td>${esc(cell)}</td>`).join("")}</tr>`))}`;$("#apply-price-table").disabled=false;}catch(error){form.querySelector(".dialog-error").textContent=error.message;}};
+$("#price-table-form").onsubmit=async event=>{event.preventDefault();if(!priceTableSession)return;const form=Object.fromEntries(new FormData(event.target));if(!confirm("Confirmar a criação/atualização dos preços apresentados?"))return;try{const result=await req(`/catalogs/materials/price-table/${priceTableSession}/apply`,{method:"POST",body:JSON.stringify({erp_code_column:form.erp_code_column,price_column:form.price_column,description_column:form.description_column,thickness_column:form.thickness_column,specification_column:form.specification_column,density_column:form.density_column,create_missing:form.create_missing==="true"})});alert(`Importação concluída.\nCriados: ${result.created}\nAtualizados: ${result.updated}\nSem alteração: ${result.unchanged}\nInválidos: ${result.invalid}${result.errors.length?"\n\n"+result.errors.slice(0,8).join("\n"):""}`);$("#price-table-dialog").close();event.target.reset();priceTableSession=null;$("#apply-price-table").disabled=true;await engineering();}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
 
 function renderPendingQuoteItems() {
   $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) => `<tr><td>${index + 1}</td><td><b>${esc(item.code)}</b><br><small>${esc(item.description)}</small></td><td>${esc(item.material || "—")}${item.thickness_mm ? `<br><small>${item.thickness_mm} mm</small>` : ""}</td><td>${item.quantity}</td><td>${item.margin_percent ?? 30}%</td><td>${item.nesting_mode === "forcar_ncav" ? `NcAv ${item.utilization_percent || "auto"}%` : esc(item.nesting_mode || "automático")}</td><td>${esc(item.routing_template_name || "Sem roteiro")}<br><small>${(item.processes || []).map(process => `${esc(process.name)} ${process.minutes} min`).join(" · ")}</small></td><td class="quote-row-actions"><button type="button" data-edit-item="${index}">Editar</button><button type="button" data-remove-item="${index}">Excluir</button></td></tr>`).join("");
@@ -722,6 +806,11 @@ function editQuoteItem(index) {
 }
 
 $("#quote-routing-template").onchange = event => renderProcessTimes(event.target.value);
+function syncCommercialOperation(){const operation=$("#quote-commercial-operation").value,isService=operation==="industrializacao"||operation==="industrializacao_material_terceiros";$("#quote-form").elements.type.value=isService?"servico":"venda";$("#consult-service-history").disabled=!isService;$("#service-history-suggestion").innerHTML=isService?'<small class="muted">A consulta usará somente OPs concluídas com tempo real.</small>':'<small class="muted">Venda possui cálculo previsível; o histórico consultivo é reservado aos serviços.</small>';}
+$("#quote-commercial-operation").onchange=syncCommercialOperation;
+syncCommercialOperation();
+$("#consult-service-history").onclick=async()=>{const form=$("#quote-form"),template=routingTemplates.find(item=>item.id===form.elements.routing_template_id.value),quantity=Number(form.elements.item_quantity.value),unitWeight=Number(form.elements.item_weight.value);if(!template||!quantity)return $("#service-history-suggestion").innerHTML='<div class="notice">Informe quantidade e selecione um roteiro para consultar.</div>';try{const result=await req("/workflows/service-price-suggestion",{method:"POST",body:JSON.stringify({commercial_operation:form.elements.commercial_operation.value,quantity,total_weight_kg:quantity*unitWeight,routing_steps:template.steps.map(step=>step.process)})});$("#service-history-suggestion").innerHTML=result.sample_count?`<div class="notice"><b>Sugestão histórica: ${money(result.suggested_value)}</b><p>${result.sample_count} OP(s) concluída(s) · ${result.suggested_minutes} min reais médios · confiança ${result.confidence_percent}%</p><small>Faixa cobrada: ${money(result.minimum_value)} a ${money(result.maximum_value)}. Consulta apenas; nenhum valor foi aplicado automaticamente.</small></div>`:`<div class="notice"><b>Sem amostra suficiente</b><p>${esc(result.reason)}</p></div>`;}catch(error){$("#service-history-suggestion").innerHTML=`<div class="notice">${esc(error.message)}</div>`;}};
+$("#consult-invoiced-history").onclick=async()=>{const code=$("#quote-form").elements.item_code.value.trim();if(!code)return alert("Informe o código do item para consultar o histórico faturado.");try{const result=await req(`/workflows/invoiced-cost-history?item_code=${encodeURIComponent(code)}`);const summary=result.sample_count?`<div class="metrics compact"><div class="metric"><b>${result.sample_count}</b><span>Faturamentos</span></div><div class="metric"><b>${result.total_invoiced_quantity}</b><span>Quantidade faturada</span></div><div class="metric"><b>${money(result.weighted_unit_cost)}</b><span>Custo unitário médio</span></div><div class="metric"><b>${money(result.suggested_unit_price)}</b><span>Preço sugerido · margem ${result.standard_margin_percent}%</span></div></div>`:`<div class="empty">Nenhum faturamento registrado para o item ${esc(code)}.</div>`;const history=result.sample_count?table(["Data / remessa","Orçamento","Cliente / ERP","Quantidade","Custo estimado","Custo real","Preço cobrado","Margem efetiva"],result.history.map(row=>`<tr><td>${new Date(row.invoiced_at).toLocaleString("pt-BR")}<br><small>Remessa ${row.invoice_sequence}</small></td><td><b>${esc(row.quote_number)}</b></td><td>${esc(row.client)}<br><small>ERP ${esc(row.erp_customer_code||"não informado")}</small></td><td>${row.quantity} ${esc(row.unit)}</td><td>${money(row.estimated_unit_cost)}</td><td>${money(row.actual_unit_cost)}</td><td><b>${money(row.unit_price)}</b></td><td>${Number(row.effective_margin_percent).toFixed(2)}%</td></tr>`)):"";$("#invoiced-history-content").innerHTML=summary+history;$("#invoiced-history-dialog").showModal();}catch(error){alert(error.message);}};
 $("#quote-nesting-mode").onchange = event => $(".ncav-field").classList.toggle("hidden", event.target.value !== "forcar_ncav");
 $("#quote-form [name=expected_delivery]").onchange = renderPendingQuoteItems;
 $("#cancel-item-edit").onclick = resetQuoteItemEditor;
@@ -749,7 +838,7 @@ $("#quote-form").onsubmit = async event => {
     return;
   }
   const payload = {
-    type:form.type, billing_unit:form.billing_unit, client_id:form.client_id, requester:form.requester,
+    type:form.type, commercial_operation:form.commercial_operation, billing_unit:form.billing_unit, client_id:form.client_id, requester:form.requester,
     prepared_by:form.prepared_by,
     valid_until:form.valid_until, expected_delivery:form.expected_delivery || null,
     payment_terms:form.payment_terms, freight_type:form.freight_type,
@@ -757,8 +846,10 @@ $("#quote-form").onsubmit = async event => {
     items
   };
   try {
-    await req("/commercial/quotes", {method:"POST", body:JSON.stringify(payload)});
-    $("#quote-dialog").close(); event.target.reset(); pendingQuoteItems = []; await quotes();
+    try{quoteDirectoryHandle=await chooseQuoteDirectory(quoteSaveMode);}catch(error){if(error.name==="AbortError")return;throw error;}
+    const quote=await req("/commercial/quotes", {method:"POST", body:JSON.stringify(payload)});
+    const savedMessage=await saveQuotePdf(quote,quoteDirectoryHandle);
+    $("#quote-dialog").close(); event.target.reset(); pendingQuoteItems = []; await quotes();alert(`${quote.number} salvo com sucesso.\n${savedMessage}`);
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
@@ -863,6 +954,11 @@ $("#password-form").onsubmit = async event => {
     $("#password-dialog").close(); event.target.reset(); await dashboard();
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
+
+async function renderPriceReviewCenter(){let card=$("#price-review-center");if(!card){card=document.createElement("article");card.id="price-review-center";card.innerHTML=`<div class="toolbar"><div><h2>Revisão de preços produzidos</h2><small>Somente itens de OPs concluídas. O histórico original nunca é alterado.</small></div><button type="button" id="filter-price-reviews">Filtrar</button></div><div class="form-grid"><label>Cliente<select id="price-review-client"><option value="">Todos</option></select></label><label>Modalidade<select id="price-review-type"><option value="">Venda e serviço</option><option value="venda">Venda</option><option value="servico">Serviço</option></select></label><label>Produzido desde<input id="price-review-start" type="date"></label><label>Produzido até<input id="price-review-end" type="date"></label><label><input id="price-review-expired" type="checkbox"> Somente vencidos</label></div><div id="price-review-table"></div>`;$("#maintenance").insertBefore(card,$("#maintenance-table").closest("article"));}const clients=await req("/commercial/clients"),select=$("#price-review-client");if(select.options.length===1)select.insertAdjacentHTML("beforeend",clients.map(item=>`<option value="${item.id}">${esc(item.name)}</option>`).join(""));const load=async()=>{const params=new URLSearchParams();if(select.value)params.set("client_id",select.value);if($("#price-review-type").value)params.set("type",$("#price-review-type").value);if($("#price-review-start").value)params.set("start",$("#price-review-start").value);if($("#price-review-end").value)params.set("end",$("#price-review-end").value);if($("#price-review-expired").checked)params.set("expired_only","true");const rows=await req(`/workflows/price-reviews?${params}`);$("#price-review-table").innerHTML=rows.length?table(["Cliente","Item / origem","Último lote","Validade","Preço histórico","Referência atual","Ação"],rows.map((item,index)=>`<tr><td>${esc(item.client)}<br><small>${esc(item.quote_type)}</small></td><td><b>${esc(item.item_code)}</b> · ${esc(item.description)}<br><small>${esc(item.quote_number)} / ${esc(item.order_number)}</small></td><td>${item.quantity} pç · ${item.total_weight_kg} kg<br><small>${item.produced_on}</small></td><td>${item.validity_days} dias<br>${pill(item.expired?"vencido":"vigente")}</td><td>${money(item.historical_unit_price)}</td><td>${money(item.current_reference_price)}${item.last_adjustment_date?`<br><small>${item.last_adjustment_date}</small>`:""}</td><td><button type="button" data-price-review="${index}">Reajustar</button></td></tr>`)):'<div class="empty">Nenhum item produzido encontrado para os filtros.</div>';document.querySelectorAll("[data-price-review]").forEach(button=>button.onclick=async()=>{const item=rows[Number(button.dataset.priceReview)],value=prompt(`Novo preço unitário para ${item.item_code}:`,item.current_reference_price);if(value===null)return;const newPrice=Number(String(value).replace(",","."));if(!(newPrice>0))return alert("Informe um preço válido.");const reason=prompt("Motivo do reajuste:",item.expired?"Revisão por validade vencida":"Revisão administrativa");if(!reason)return;await req("/commercial/price-adjustments",{method:"POST",body:JSON.stringify({client_id:item.client_id,item_code:item.item_code,commercial_operation:item.commercial_operation,previous_unit_price:item.current_reference_price,new_unit_price:newPrice,reason,effective_date:new Date().toISOString().slice(0,10)})});await load();});};$("#filter-price-reviews").onclick=load;await load();}
+
+const recoveredMaintenanceLabels={commercialParameters:"Parâmetros comerciais v0.51",laserParameters:"Laser",models:"Modelos de fabricação",processes:"Processos",standardSheets:"Chapas padrão",utilizationIncrements:"Aproveitamento automático",largePieceLossRules:"Perda peça unitária",taxScenarios:"Tributação",operationNatures:"Operações e ERP",crmStages:"CRM · Etapas",crmActivities:"CRM · Atividades",crmLossReasons:"CRM · Motivos",crmRules:"CRM · Regras"};
+async function renderRecoveredMaintenance(){let card=$("#recovered-maintenance-card");if(!card){card=document.createElement("article");card.id="recovered-maintenance-card";card.innerHTML=`<div class="toolbar"><div><h2>Cadastros recuperados da v0.51</h2><small>Configurações administrativas consolidadas a partir da versão de referência.</small></div><button type="button" id="reset-recovered-maintenance" class="cancel">Restaurar v0.51</button></div><div id="recovered-maintenance-tabs" class="maintenance-tabs"></div><div id="recovered-maintenance-editor"></div>`;$("#maintenance").insertBefore(card,$("#material-cost-settings-card")||$("#routing-settings-card"));}const categories=await req("/maintenance-config/categories"),names=Object.keys(recoveredMaintenanceLabels).filter(name=>categories[name]!==undefined);let active=card.dataset.activeCategory||names[0];const tabs=$("#recovered-maintenance-tabs"),editor=$("#recovered-maintenance-editor");tabs.innerHTML=names.map(name=>`<button type="button" data-maint-category="${name}" class="${name===active?"active":""}">${recoveredMaintenanceLabels[name]} <small>${categories[name]}</small></button>`).join("");const open=async name=>{card.dataset.activeCategory=name;tabs.querySelectorAll("button").forEach(button=>button.classList.toggle("active",button.dataset.maintCategory===name));const rows=await req(`/maintenance-config/${name}`),keys=[...new Set(rows.flatMap(row=>Object.keys(row)))];const input=(value,key,index)=>`<input data-recovered-row="${index}" data-recovered-key="${esc(key)}" value="${esc(value??"")}">`;editor.innerHTML=`<div class="table-wrap wide-admin-table"><table><thead><tr>${keys.map(key=>`<th>${esc(key)}</th>`).join("")}<th>Ação</th></tr></thead><tbody>${rows.map((row,index)=>`<tr>${keys.map(key=>`<td>${input(row[key],key,index)}</td>`).join("")}<td><button type="button" class="cancel" data-remove-recovered>Excluir</button></td></tr>`).join("")}</tbody></table></div><p><button type="button" id="add-recovered-row">+ Adicionar linha</button> <button type="button" id="save-recovered-maintenance">Salvar ${recoveredMaintenanceLabels[name]}</button> <span id="recovered-maintenance-status"></span></p>`;const bindRemove=()=>editor.querySelectorAll("[data-remove-recovered]").forEach(button=>button.onclick=()=>button.closest("tr").remove());bindRemove();$("#add-recovered-row").onclick=()=>{editor.querySelector("tbody").insertAdjacentHTML("beforeend",`<tr>${keys.map(key=>`<td>${input("",key,rows.length)}</td>`).join("")}<td><button type="button" class="cancel" data-remove-recovered>Excluir</button></td></tr>`);bindRemove();};$("#save-recovered-maintenance").onclick=async()=>{const saved=[...editor.querySelectorAll("tbody tr")].map(tr=>Object.fromEntries([...tr.querySelectorAll("input")].map(field=>{const original=rows[Number(field.dataset.recoveredRow)]?.[field.dataset.recoveredKey],value=field.value;return [field.dataset.recoveredKey,typeof original==="number"?Number(value):value]})));await req(`/maintenance-config/${name}`,{method:"PUT",body:JSON.stringify(saved)});$("#recovered-maintenance-status").textContent="Cadastro salvo.";await renderRecoveredMaintenance();};};tabs.querySelectorAll("button").forEach(button=>button.onclick=()=>open(button.dataset.maintCategory));$("#reset-recovered-maintenance").onclick=async()=>{if(!confirm("Restaurar todos os cadastros aos valores recuperados da v0.51?"))return;await req("/maintenance-config/reset/v051",{method:"POST"});card.dataset.activeCategory="";await renderRecoveredMaintenance();};await open(active);}
 
 (async () => {
   try {

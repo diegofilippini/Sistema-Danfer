@@ -14,7 +14,7 @@ ROLE_PREFIXES = {
     "/api/v1/commercial": {UserRole.ADMIN, UserRole.COMMERCIAL},
     "/api/v1/imports": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.ENGINEERING},
     "/api/v1/engineering": {UserRole.ADMIN, UserRole.ENGINEERING, UserRole.COMMERCIAL},
-    "/api/v1/pcp": {UserRole.ADMIN, UserRole.PCP, UserRole.PRODUCTION},
+    "/api/v1/pcp": {UserRole.ADMIN, UserRole.PCP, UserRole.PRODUCTION, UserRole.COST_ANALYST},
     "/api/v1/quality": {UserRole.ADMIN, UserRole.QUALITY, UserRole.PRODUCTION},
     "/api/v1/maintenance": {UserRole.ADMIN, UserRole.PRODUCTION},
     "/api/v1/catalogs": {UserRole.ADMIN, UserRole.ENGINEERING, UserRole.COMMERCIAL},
@@ -28,6 +28,7 @@ ROLE_PREFIXES = {
     "/api/v1/audit": {UserRole.ADMIN},
     "/api/v1/analytics": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP, UserRole.QUALITY, UserRole.VIEWER},
     "/api/v1/crm": {UserRole.ADMIN, UserRole.COMMERCIAL},
+    "/api/v1/search": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP, UserRole.ENGINEERING, UserRole.PRODUCTION, UserRole.QUALITY, UserRole.VIEWER},
     "/api/v1/push": {UserRole.ADMIN, UserRole.COMMERCIAL, UserRole.PCP, UserRole.ENGINEERING, UserRole.PRODUCTION, UserRole.QUALITY, UserRole.VIEWER},
 }
 

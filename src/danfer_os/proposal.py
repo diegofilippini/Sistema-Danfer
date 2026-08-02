@@ -155,7 +155,7 @@ def build_proposal_pdf(quote: Quote, client: Client, settings: CostSettings | No
     identity = Table([[Paragraph(f"<b>{kind}</b><br/><font size='15'>{escape(quote.number)}</font>", styles["body"]), Paragraph(f"<b>REVISÃO</b><br/><font size='15'>{escape(quote.revision)}</font>", styles["right"]), Paragraph(f"<b>EMISSÃO</b><br/>{quote.created_at:%d/%m/%Y}<br/><b>VALIDADE</b><br/>{quote.valid_until:%d/%m/%Y}", styles["right"])]], colWidths=[100 * mm, 30 * mm, 49 * mm])
     identity.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), PALE), ("BOX", (0, 0), (-1, -1), .6, LINE), ("LINEBEFORE", (1, 0), (-1, 0), .5, LINE), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LEFTPADDING", (0, 0), (-1, -1), 4 * mm), ("RIGHTPADDING", (0, 0), (-1, -1), 4 * mm), ("TOPPADDING", (0, 0), (-1, -1), 2 * mm), ("BOTTOMPADDING", (0, 0), (-1, -1), 2 * mm)]))
     commercial = Table([
-        [_label_value("Cliente", client.name, styles), _label_value("Condição de pagamento", quote.payment_terms or client.payment_terms, styles), _label_value("Natureza da operação", quote.nature_operation, styles)],
+        [_label_value("Cliente / código ERP", f"{client.erp_code} - {client.name}" if client.erp_code else client.name, styles), _label_value("Condição de pagamento", quote.payment_terms or client.payment_terms, styles), _label_value("Natureza da operação", quote.nature_operation, styles)],
         [_label_value("Solicitante", quote.requester or client.contact, styles), _label_value("Faturamento", quote.billing_unit.value.upper(), styles), _label_value("Frete", f"{quote.freight_type.value} - por conta de {quote.freight_payer.value}", styles)],
         [_label_value("Entrega prevista", quote.expected_delivery.strftime("%d/%m/%Y") if quote.expected_delivery else "A combinar", styles), _label_value("Local de entrega", client.address or "A combinar", styles), _label_value("Cenário tributário", quote.tax_scenario, styles)],
     ], colWidths=[60 * mm, 60 * mm, 59 * mm])
@@ -233,7 +233,7 @@ def build_proposal_pdf(quote: Quote, client: Client, settings: CostSettings | No
     delivery = quote.expected_delivery.strftime("%d/%m/%Y") if quote.expected_delivery else "A combinar"
     validity_days = max((quote.valid_until - quote.created_at.date()).days, 0)
     top = Table([[
-        field("Cliente", client.name), field("Solicitante", quote.requester or client.contact),
+        field("Cliente / código ERP", f"{client.erp_code} - {client.name}" if client.erp_code else client.name), field("Solicitante", quote.requester or client.contact),
         field("Emissão", quote.created_at.strftime("%d/%m/%Y")), field("Entrega prevista", delivery),
         field("Orçamento", f"{quote.number}\nVálido por {validity_days} dias", True),
     ]], colWidths=[52 * mm, 42 * mm, 29 * mm, 30 * mm, 32 * mm])

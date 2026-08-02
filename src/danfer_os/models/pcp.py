@@ -23,6 +23,21 @@ class ProductionOrderCreate(BaseModel):
     estimated_material_cost: float = Field(default=0, ge=0)
     estimated_process_cost: float = Field(default=0, ge=0)
     notes: str = Field(default="", max_length=1000)
+    source_quote_id: UUID | None = None
+    source_quote_number: str = Field(default="", max_length=50)
+    client_name: str = Field(default="", max_length=160)
+    material: str = Field(default="", max_length=120)
+    thickness_mm: float | None = Field(default=None, ge=0)
+    routing_steps: list[str] = Field(default_factory=list)
+    production_items: list["ProductionOrderItem"] = Field(default_factory=list)
+    number_override: str | None = Field(default=None, max_length=60, exclude=True)
+
+
+class ProductionOrderItem(BaseModel):
+    code: str = Field(min_length=1, max_length=80)
+    description: str = Field(default="", max_length=300)
+    quantity: float = Field(gt=0)
+    unit_weight_kg: float = Field(default=0, ge=0)
 
 
 class ProductionOrderUpdate(BaseModel):
@@ -131,9 +146,20 @@ class DirectRequestStatus(StrEnum):
     CANCELLED = "cancelada"
 
 
+class DirectProductionRequestItem(BaseModel):
+    code: str = Field(min_length=1, max_length=60)
+    description: str = Field(min_length=2, max_length=200)
+    quantity: float = Field(gt=0)
+    unit: str = Field(default="un", min_length=1, max_length=20)
+    material: str = Field(default="", max_length=120)
+    thickness_mm: float | None = Field(default=None, gt=0)
+    unit_price: float = Field(default=0, ge=0)
+
+
 class DirectProductionRequestCreate(BaseModel):
-    origin: str = Field(default="pedido_direto", max_length=50)
+    origin: str = Field(default="pedido_manual_sem_orcamento", max_length=50)
     client: str = Field(min_length=2, max_length=160)
+    customer_erp_code: str = Field(default="", max_length=60)
     contact: str = Field(default="", max_length=120)
     description: str = Field(min_length=3, max_length=1000)
     processes: list[str] = Field(min_length=1)
@@ -142,6 +168,9 @@ class DirectProductionRequestCreate(BaseModel):
     priority: int = Field(default=3, ge=1, le=5)
     billing_unit: str = Field(default="danfer", max_length=30)
     reason: str = Field(default="", max_length=300)
+    customer_order_number: str = Field(default="", max_length=80)
+    items: list[DirectProductionRequestItem] = Field(default_factory=list, max_length=500)
+    requested_by: str = Field(default="", max_length=120)
 
 
 class DirectProductionRequest(DirectProductionRequestCreate):
@@ -149,6 +178,7 @@ class DirectProductionRequest(DirectProductionRequestCreate):
     number: str
     status: DirectRequestStatus = DirectRequestStatus.OPEN
     progress_percent: float = Field(default=0, ge=0, le=100)
+    total_value: float = Field(default=0, ge=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

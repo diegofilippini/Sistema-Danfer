@@ -1,0 +1,1894 @@
+{
+  "meta": {
+    "versao": "0.2",
+    "fonte": "Sistema_Danfer_Versao_1_0_Testes.xlsx",
+    "importadoEm": "2026-07-19"
+  },
+  "materials": [
+    {
+      "material": "aço carbono",
+      "espessura": 0.45,
+      "densidade": 7850,
+      "valorKg": 10,
+      "velLaser": 6000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 0.45 mm",
+      "codigoERP": "1000045"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 0.6,
+      "densidade": 7850,
+      "valorKg": 8.58,
+      "velLaser": 6000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 0.6 mm",
+      "codigoERP": "1000060"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 0.9,
+      "densidade": 7850,
+      "valorKg": 6.8,
+      "velLaser": 6000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 0.9 mm",
+      "codigoERP": "100009"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 1,
+      "densidade": 7850,
+      "valorKg": 7.08,
+      "velLaser": 5500,
+      "velPlasma": null,
+      "descricao": "aço carbono | 1 mm",
+      "codigoERP": "1000100"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 1.06,
+      "densidade": 7850,
+      "valorKg": 7.08,
+      "velLaser": 5500,
+      "velPlasma": null,
+      "descricao": "aço carbono | 1,06 mm",
+      "codigoERP": "1000106"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 1.2,
+      "densidade": 7850,
+      "valorKg": 6.67,
+      "velLaser": 5000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 1.2 mm",
+      "codigoERP": "100012"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 1.5,
+      "densidade": 7850,
+      "valorKg": 6.67,
+      "velLaser": 4800,
+      "velPlasma": null,
+      "descricao": "aço carbono | 1.5 mm",
+      "codigoERP": "100015"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 1.9,
+      "densidade": 7850,
+      "valorKg": 6.67,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 1.90 mm",
+      "codigoERP": "100019"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 2,
+      "densidade": 7850,
+      "valorKg": 5.87,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 2 mm",
+      "codigoERP": "100020"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 2.25,
+      "densidade": 780,
+      "valorKg": 5.87,
+      "velLaser": 3500,
+      "velPlasma": null,
+      "descricao": "aço carbono | 2,25 mm",
+      "codigoERP": "1000225"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 2.65,
+      "densidade": 7850,
+      "valorKg": 5.45,
+      "velLaser": 3500,
+      "velPlasma": null,
+      "descricao": "aço carbono | 2.65 mm",
+      "codigoERP": "1000265"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 3,
+      "densidade": 7850,
+      "valorKg": 5.72,
+      "velLaser": 2600,
+      "velPlasma": null,
+      "descricao": "aço carbono | 3 mm",
+      "codigoERP": "100030"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 3.75,
+      "densidade": 7850,
+      "valorKg": 5.6,
+      "velLaser": 2200,
+      "velPlasma": null,
+      "descricao": "aço carbono | 3.75 mm",
+      "codigoERP": "1000375"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 4.25,
+      "densidade": 7850,
+      "valorKg": 6.2,
+      "velLaser": 1800,
+      "velPlasma": null,
+      "descricao": "aço carbono | 4.25 mm",
+      "codigoERP": "1000425"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 4.75,
+      "densidade": 7850,
+      "valorKg": 5.62,
+      "velLaser": 1700,
+      "velPlasma": null,
+      "descricao": "aço carbono | 4.75 mm",
+      "codigoERP": "1000475"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 6.35,
+      "densidade": 7850,
+      "valorKg": 5.5,
+      "velLaser": 1400,
+      "velPlasma": null,
+      "descricao": "aço carbono | 6.35 mm",
+      "codigoERP": "1000635"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 8,
+      "densidade": 7850,
+      "valorKg": 5.75,
+      "velLaser": 1200,
+      "velPlasma": null,
+      "descricao": "aço carbono | 8 mm",
+      "codigoERP": "1000800"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 9.53,
+      "densidade": 7850,
+      "valorKg": 5.7,
+      "velLaser": 1000,
+      "velPlasma": null,
+      "descricao": "aço carbono | 9.53 mm",
+      "codigoERP": "1000953"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 12.7,
+      "densidade": 7850,
+      "valorKg": 5.6,
+      "velLaser": 720,
+      "velPlasma": null,
+      "descricao": "aço carbono | 12.7 mm",
+      "codigoERP": "1000127"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 15.88,
+      "densidade": 7850,
+      "valorKg": 5.35,
+      "velLaser": 450,
+      "velPlasma": null,
+      "descricao": "aço carbono | 15.88 mm",
+      "codigoERP": "10001588"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 19,
+      "densidade": 7850,
+      "valorKg": 5.35,
+      "velLaser": 250,
+      "velPlasma": null,
+      "descricao": "aço carbono | 19 mm",
+      "codigoERP": "10001900"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 22.22,
+      "densidade": 7850,
+      "valorKg": 6.28,
+      "velLaser": null,
+      "velPlasma": 320,
+      "descricao": "aço carbono | 22.22 mm",
+      "codigoERP": "10002200"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 25.4,
+      "densidade": 7850,
+      "valorKg": 6.28,
+      "velLaser": null,
+      "velPlasma": 300,
+      "descricao": "aço carbono | 25.4 mm",
+      "codigoERP": "10002540"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 32,
+      "densidade": 7850,
+      "valorKg": 7.3,
+      "velLaser": null,
+      "velPlasma": 250,
+      "descricao": "aço carbono | 32 mm",
+      "codigoERP": "10003200"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 38,
+      "densidade": 7850,
+      "valorKg": 7.3,
+      "velLaser": null,
+      "velPlasma": 200,
+      "descricao": "aço carbono | 38 mm",
+      "codigoERP": "10003800"
+    },
+    {
+      "material": "aço carbono",
+      "espessura": 51,
+      "densidade": 7850,
+      "valorKg": 8.7,
+      "velLaser": null,
+      "velPlasma": 150,
+      "descricao": "aço carbono | 51 mm",
+      "codigoERP": "10005100"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 0.5,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 5500,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 0.5 mm",
+      "codigoERP": "3000050"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 0.9,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 5000,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 0.9 mm",
+      "codigoERP": "3000090"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 1,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 1 mm",
+      "codigoERP": "3000100"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 1.2,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 4200,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 1.2 mm",
+      "codigoERP": "3000120"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 1.5,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 1.5 mm",
+      "codigoERP": "3000150"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 1.8,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 3500,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 1.8 mm",
+      "codigoERP": "3000180"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 2,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 3000,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 2 mm",
+      "codigoERP": "3000200"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 2.5,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 2500,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 2.5 mm",
+      "codigoERP": "3000250"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 3,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 1500,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 3 mm",
+      "codigoERP": "3000300"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 4,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 1000,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 4 mm",
+      "codigoERP": "3000400"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 4.75,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 600,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 4,75 mm",
+      "codigoERP": "3000475"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 5,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 450,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 5 mm",
+      "codigoERP": "3000500"
+    },
+    {
+      "material": "aço inox 304",
+      "espessura": 6,
+      "densidade": 8000,
+      "valorKg": 28,
+      "velLaser": 350,
+      "velPlasma": null,
+      "descricao": "aço inox 304 | 6 mm",
+      "codigoERP": "3000600"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 0.5,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 5500,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 0.5 mm",
+      "codigoERP": "3100050"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 0.9,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 5000,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 0.9 mm",
+      "codigoERP": "3100090"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 1,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 1 mm",
+      "codigoERP": "3100100"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 1.2,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 4200,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 1.2 mm",
+      "codigoERP": "3100120"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 1.5,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 1.5 mm",
+      "codigoERP": "3100150"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 1.8,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 3500,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 1.8 mm",
+      "codigoERP": "3100180"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 2,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 3000,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 2 mm",
+      "codigoERP": "3100200"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 2.5,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 2500,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 2.5 mm",
+      "codigoERP": "3100250"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 3,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 1500,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 3 mm",
+      "codigoERP": "3100300"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 4,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 1000,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 4 mm",
+      "codigoERP": "3100400"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 5,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 450,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 5 mm",
+      "codigoERP": "3100500"
+    },
+    {
+      "material": "aço inox 430",
+      "espessura": 6,
+      "densidade": 7750,
+      "valorKg": 23,
+      "velLaser": 350,
+      "velPlasma": null,
+      "descricao": "aço inox 430 | 6 mm",
+      "codigoERP": "3100600"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 0.5,
+      "densidade": 7850,
+      "valorKg": 8.1,
+      "velLaser": 4500,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 0.50 mm",
+      "codigoERP": "2000050"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 0.95,
+      "densidade": 7850,
+      "valorKg": 8.1,
+      "velLaser": 4500,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 0.95 mm",
+      "codigoERP": "2000095"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 1.25,
+      "densidade": 7850,
+      "valorKg": 8.1,
+      "velLaser": 4000,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 1.25 mm",
+      "codigoERP": "2000125"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 1.55,
+      "densidade": 7850,
+      "valorKg": 8.1,
+      "velLaser": 3000,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 1.55 mm",
+      "codigoERP": "2000195"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 1.95,
+      "densidade": 7850,
+      "valorKg": 8.1,
+      "velLaser": 2500,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 1.95 mm",
+      "codigoERP": "2000195"
+    },
+    {
+      "material": "aço galvanizado",
+      "espessura": 2.7,
+      "densidade": 7850,
+      "valorKg": 9.2,
+      "velLaser": 2400,
+      "velPlasma": null,
+      "descricao": "aço galvanizado | 2.7 mm",
+      "codigoERP": "2000270"
+    },
+    {
+      "material": "aço carbono xadrez",
+      "espessura": 2.5,
+      "densidade": 7850,
+      "valorKg": 6.73,
+      "velLaser": 2500,
+      "velPlasma": null,
+      "descricao": "aço carbono xadrez | 2.50 mm",
+      "codigoERP": "5000250"
+    },
+    {
+      "material": "aço carbono xadrez",
+      "espessura": 3.25,
+      "densidade": 7850,
+      "valorKg": 6.73,
+      "velLaser": 2000,
+      "velPlasma": null,
+      "descricao": "aço carbono xadrez | 3.00 mm",
+      "codigoERP": "5000300"
+    },
+    {
+      "material": "aço carbono xadrez",
+      "espessura": 5,
+      "densidade": 7850,
+      "valorKg": 6.97,
+      "velLaser": 1500,
+      "velPlasma": null,
+      "descricao": "aço carbono xadrez | 4.75 mm",
+      "codigoERP": "5000475"
+    },
+    {
+      "material": "aço carbono xadrez",
+      "espessura": 6.5,
+      "densidade": 7850,
+      "valorKg": 6.97,
+      "velLaser": 1000,
+      "velPlasma": null,
+      "descricao": "aço carbono xadrez | 6.35 mm",
+      "codigoERP": "5000635"
+    }
+  ],
+  "models": [
+    {
+      "codigo": "L",
+      "descricao": "Corte laser",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2",
+      "roteiroERP": "2 - Corte laser"
+    },
+    {
+      "codigo": "G",
+      "descricao": "Guilhotina",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3",
+      "roteiroERP": "3 - Guilhotina"
+    },
+    {
+      "codigo": "PL",
+      "descricao": "Plasma",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4",
+      "roteiroERP": "4 - Plasma"
+    },
+    {
+      "codigo": "D",
+      "descricao": "Dobra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5",
+      "roteiroERP": "5 - Dobra"
+    },
+    {
+      "codigo": "C",
+      "descricao": "Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6",
+      "roteiroERP": "6 - Calandra"
+    },
+    {
+      "codigo": "PR",
+      "descricao": "Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "7",
+      "roteiroERP": "7 - Prensa"
+    },
+    {
+      "codigo": "CH",
+      "descricao": "Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "8",
+      "roteiroERP": "8 - Chanfro"
+    },
+    {
+      "codigo": "S",
+      "descricao": "Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "9",
+      "roteiroERP": "9 - Solda"
+    },
+    {
+      "codigo": "LD",
+      "descricao": "Corte laser + Dobra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra"
+    },
+    {
+      "codigo": "LC",
+      "descricao": "Corte laser + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra"
+    },
+    {
+      "codigo": "LPR",
+      "descricao": "Corte laser + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;7",
+      "roteiroERP": "2 - Corte laser → 7 - Prensa"
+    },
+    {
+      "codigo": "LS",
+      "descricao": "Corte laser + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;9",
+      "roteiroERP": "2 - Corte laser → 9 - Solda"
+    },
+    {
+      "codigo": "GD",
+      "descricao": "Guilhotina + Dobra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra"
+    },
+    {
+      "codigo": "GC",
+      "descricao": "Guilhotina + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;6",
+      "roteiroERP": "3 - Guilhotina → 6 - Calandra"
+    },
+    {
+      "codigo": "GPR",
+      "descricao": "Guilhotina + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;7",
+      "roteiroERP": "3 - Guilhotina → 7 - Prensa"
+    },
+    {
+      "codigo": "GS",
+      "descricao": "Guilhotina + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;9",
+      "roteiroERP": "3 - Guilhotina → 9 - Solda"
+    },
+    {
+      "codigo": "PLD",
+      "descricao": "Plasma + Dobra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5",
+      "roteiroERP": "4 - Plasma → 5 - Dobra"
+    },
+    {
+      "codigo": "PLC",
+      "descricao": "Plasma + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6",
+      "roteiroERP": "4 - Plasma → 6 - Calandra"
+    },
+    {
+      "codigo": "PLCH",
+      "descricao": "Plasma + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;8",
+      "roteiroERP": "4 - Plasma → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLS",
+      "descricao": "Plasma + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;9",
+      "roteiroERP": "4 - Plasma → 9 - Solda"
+    },
+    {
+      "codigo": "DC",
+      "descricao": "Dobra + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6",
+      "roteiroERP": "5 - Dobra → 6 - Calandra"
+    },
+    {
+      "codigo": "DPR",
+      "descricao": "Dobra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;7",
+      "roteiroERP": "5 - Dobra → 7 - Prensa"
+    },
+    {
+      "codigo": "DS",
+      "descricao": "Dobra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;9",
+      "roteiroERP": "5 - Dobra → 9 - Solda"
+    },
+    {
+      "codigo": "CS",
+      "descricao": "Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6;9",
+      "roteiroERP": "6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "PRCH",
+      "descricao": "Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "7;8",
+      "roteiroERP": "7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "LDC",
+      "descricao": "Corte laser + Dobra + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;6",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 6 - Calandra"
+    },
+    {
+      "codigo": "LDPR",
+      "descricao": "Corte laser + Dobra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;7",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 7 - Prensa"
+    },
+    {
+      "codigo": "LDCH",
+      "descricao": "Corte laser + Dobra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;8",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 8 - Chanfro"
+    },
+    {
+      "codigo": "LDS",
+      "descricao": "Corte laser + Dobra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 9 - Solda"
+    },
+    {
+      "codigo": "LCPR",
+      "descricao": "Corte laser + Calandra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;7",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 7 - Prensa"
+    },
+    {
+      "codigo": "LCCH",
+      "descricao": "Corte laser + Calandra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;8",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 8 - Chanfro"
+    },
+    {
+      "codigo": "LCS",
+      "descricao": "Corte laser + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;9",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "LPRCH",
+      "descricao": "Corte laser + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;7;8",
+      "roteiroERP": "2 - Corte laser → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "LPRS",
+      "descricao": "Corte laser + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;7;9",
+      "roteiroERP": "2 - Corte laser → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "LCHS",
+      "descricao": "Corte laser + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;8;9",
+      "roteiroERP": "2 - Corte laser → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "GDC",
+      "descricao": "Guilhotina + Dobra + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;6",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 6 - Calandra"
+    },
+    {
+      "codigo": "GDPR",
+      "descricao": "Guilhotina + Dobra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;7",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 7 - Prensa"
+    },
+    {
+      "codigo": "GDCH",
+      "descricao": "Guilhotina + Dobra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;8",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 8 - Chanfro"
+    },
+    {
+      "codigo": "GDS",
+      "descricao": "Guilhotina + Dobra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;9",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 9 - Solda"
+    },
+    {
+      "codigo": "GCS",
+      "descricao": "Guilhotina + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;6;9",
+      "roteiroERP": "3 - Guilhotina → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "GPRCH",
+      "descricao": "Guilhotina + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;7;8",
+      "roteiroERP": "3 - Guilhotina → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "GPRS",
+      "descricao": "Guilhotina + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;7;9",
+      "roteiroERP": "3 - Guilhotina → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "GCHS",
+      "descricao": "Guilhotina + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;8;9",
+      "roteiroERP": "3 - Guilhotina → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLDC",
+      "descricao": "Plasma + Dobra + Calandra",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra"
+    },
+    {
+      "codigo": "PLDPR",
+      "descricao": "Plasma + Dobra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;7",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 7 - Prensa"
+    },
+    {
+      "codigo": "PLDCH",
+      "descricao": "Plasma + Dobra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;8",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLDS",
+      "descricao": "Plasma + Dobra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 9 - Solda"
+    },
+    {
+      "codigo": "PLCPR",
+      "descricao": "Plasma + Calandra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6;7",
+      "roteiroERP": "4 - Plasma → 6 - Calandra → 7 - Prensa"
+    },
+    {
+      "codigo": "PLCCH",
+      "descricao": "Plasma + Calandra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6;8",
+      "roteiroERP": "4 - Plasma → 6 - Calandra → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLCS",
+      "descricao": "Plasma + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6;9",
+      "roteiroERP": "4 - Plasma → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "PLPRCH",
+      "descricao": "Plasma + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;7;8",
+      "roteiroERP": "4 - Plasma → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLPRS",
+      "descricao": "Plasma + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;7;9",
+      "roteiroERP": "4 - Plasma → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "PLCHS",
+      "descricao": "Plasma + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;8;9",
+      "roteiroERP": "4 - Plasma → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "DCCH",
+      "descricao": "Dobra + Calandra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;8",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 8 - Chanfro"
+    },
+    {
+      "codigo": "DCS",
+      "descricao": "Dobra + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;9",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "DPRCH",
+      "descricao": "Dobra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;7;8",
+      "roteiroERP": "5 - Dobra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "DPRS",
+      "descricao": "Dobra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;7;9",
+      "roteiroERP": "5 - Dobra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "DCHS",
+      "descricao": "Dobra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;8;9",
+      "roteiroERP": "5 - Dobra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "CPRCH",
+      "descricao": "Calandra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6;7;8",
+      "roteiroERP": "6 - Calandra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "CPRS",
+      "descricao": "Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6;7;9",
+      "roteiroERP": "6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "CCHS",
+      "descricao": "Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6;8;9",
+      "roteiroERP": "6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PRCHS",
+      "descricao": "Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "7;8;9",
+      "roteiroERP": "7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LDCS",
+      "descricao": "Corte laser + Dobra + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;6;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "LDPRS",
+      "descricao": "Corte laser + Dobra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;7;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "LDCHS",
+      "descricao": "Corte laser + Dobra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;8;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LCPRCH",
+      "descricao": "Corte laser + Calandra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;7;8",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "LCPRS",
+      "descricao": "Corte laser + Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;7;9",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "LCCHS",
+      "descricao": "Corte laser + Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;8;9",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LPRCHS",
+      "descricao": "Corte laser + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;7;8;9",
+      "roteiroERP": "2 - Corte laser → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "GDCPR",
+      "descricao": "Guilhotina + Dobra + Calandra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;6;7",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 6 - Calandra → 7 - Prensa"
+    },
+    {
+      "codigo": "GDCCH",
+      "descricao": "Guilhotina + Dobra + Calandra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;6;8",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 6 - Calandra → 8 - Chanfro"
+    },
+    {
+      "codigo": "GDCS",
+      "descricao": "Guilhotina + Dobra + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;6;9",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "GDPRCH",
+      "descricao": "Guilhotina + Dobra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;7;8",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "GDPRS",
+      "descricao": "Guilhotina + Dobra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;7;9",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "GDCHS",
+      "descricao": "Guilhotina + Dobra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;8;9",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "GCPRCH",
+      "descricao": "Guilhotina + Calandra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;6;7;8",
+      "roteiroERP": "3 - Guilhotina → 6 - Calandra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "GCPRS",
+      "descricao": "Guilhotina + Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;6;7;9",
+      "roteiroERP": "3 - Guilhotina → 6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "GPRCHS",
+      "descricao": "Guilhotina + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;7;8;9",
+      "roteiroERP": "3 - Guilhotina → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLDCPR",
+      "descricao": "Plasma + Dobra + Calandra + Prensa",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6;7",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra → 7 - Prensa"
+    },
+    {
+      "codigo": "PLDCCH",
+      "descricao": "Plasma + Dobra + Calandra + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6;8",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLDCS",
+      "descricao": "Plasma + Dobra + Calandra + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra → 9 - Solda"
+    },
+    {
+      "codigo": "PLDPRCH",
+      "descricao": "Plasma + Dobra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;7;8",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "PLDPRS",
+      "descricao": "Plasma + Dobra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;7;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "PLDCHS",
+      "descricao": "Plasma + Dobra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;8;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLCPRS",
+      "descricao": "Plasma + Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6;7;9",
+      "roteiroERP": "4 - Plasma → 6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "PLCCHS",
+      "descricao": "Plasma + Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;6;8;9",
+      "roteiroERP": "4 - Plasma → 6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLPRCHS",
+      "descricao": "Plasma + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;7;8;9",
+      "roteiroERP": "4 - Plasma → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "DCPRCH",
+      "descricao": "Dobra + Calandra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;7;8",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "DCPRS",
+      "descricao": "Dobra + Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;7;9",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "DCCHS",
+      "descricao": "Dobra + Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;8;9",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "DPRCHS",
+      "descricao": "Dobra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;7;8;9",
+      "roteiroERP": "5 - Dobra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "CPRCHS",
+      "descricao": "Calandra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "6;7;8;9",
+      "roteiroERP": "6 - Calandra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LDCPRCH",
+      "descricao": "Corte laser + Dobra + Calandra + Prensa + Chanfro",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;6;7;8",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 6 - Calandra → 7 - Prensa → 8 - Chanfro"
+    },
+    {
+      "codigo": "LDCPRS",
+      "descricao": "Corte laser + Dobra + Calandra + Prensa + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;6;7;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 6 - Calandra → 7 - Prensa → 9 - Solda"
+    },
+    {
+      "codigo": "LDCCHS",
+      "descricao": "Corte laser + Dobra + Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;6;8;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LDPRCHS",
+      "descricao": "Corte laser + Dobra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;5;7;8;9",
+      "roteiroERP": "2 - Corte laser → 5 - Dobra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "LCPRCHS",
+      "descricao": "Corte laser + Calandra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "2;6;7;8;9",
+      "roteiroERP": "2 - Corte laser → 6 - Calandra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "GDPRCHS",
+      "descricao": "Guilhotina + Dobra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;5;7;8;9",
+      "roteiroERP": "3 - Guilhotina → 5 - Dobra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "GCPRCHS",
+      "descricao": "Guilhotina + Calandra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "3;6;7;8;9",
+      "roteiroERP": "3 - Guilhotina → 6 - Calandra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLDCCHS",
+      "descricao": "Plasma + Dobra + Calandra + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6;8;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLDPRCHS",
+      "descricao": "Plasma + Dobra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;7;8;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "DCPRCHS",
+      "descricao": "Dobra + Calandra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "5;6;7;8;9",
+      "roteiroERP": "5 - Dobra → 6 - Calandra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    },
+    {
+      "codigo": "PLDCPRCHS",
+      "descricao": "Plasma + Dobra + Calandra + Prensa + Chanfro + Solda",
+      "ativo": "Sim",
+      "observacao": "Uso em Venda ou Serviço",
+      "codigosERP": "4;5;6;7;8;9",
+      "roteiroERP": "4 - Plasma → 5 - Dobra → 6 - Calandra → 7 - Prensa → 8 - Chanfro → 9 - Solda"
+    }
+  ],
+  "processes": [
+    {
+      "codigoERP": "2",
+      "operacao": "Corte laser",
+      "grupo": "Corte",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 1,
+      "observacao": "Operação de corte a laser"
+    },
+    {
+      "codigoERP": "3",
+      "operacao": "Guilhotina",
+      "grupo": "Corte",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 2,
+      "observacao": "Corte reto em guilhotina"
+    },
+    {
+      "codigoERP": "4",
+      "operacao": "Plasma",
+      "grupo": "Corte",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 3,
+      "observacao": "Corte por plasma"
+    },
+    {
+      "codigoERP": "5",
+      "operacao": "Dobra",
+      "grupo": "Conformação",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 4,
+      "observacao": "Dobra em prensa dobradeira CNC"
+    },
+    {
+      "codigoERP": "6",
+      "operacao": "Calandra",
+      "grupo": "Conformação",
+      "metodo": "Tempo ou peso",
+      "unidade": "hora/kg",
+      "ativo": "Sim",
+      "ordem": 5,
+      "observacao": "Calandragem por tempo ou peso"
+    },
+    {
+      "codigoERP": "7",
+      "operacao": "Prensa",
+      "grupo": "Conformação",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 6,
+      "observacao": "Operação em prensa"
+    },
+    {
+      "codigoERP": "8",
+      "operacao": "Chanfro",
+      "grupo": "Preparação",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 7,
+      "observacao": "Preparação de borda / chanfro"
+    },
+    {
+      "codigoERP": "9",
+      "operacao": "Solda",
+      "grupo": "União",
+      "metodo": "Tempo",
+      "unidade": "hora",
+      "ativo": "Sim",
+      "ordem": 8,
+      "observacao": "Operação de soldagem"
+    }
+  ],
+  "commercialParameters": [
+    {
+      "parametro": "Margem padrão",
+      "valor": "0.3"
+    },
+    {
+      "parametro": "Carga tributária legado",
+      "valor": "0.17"
+    },
+    {
+      "parametro": "Custos indiretos",
+      "valor": "0.08"
+    },
+    {
+      "parametro": "Tempo padrão por dobra (seg.)",
+      "valor": "20"
+    },
+    {
+      "parametro": "Tempo mínimo por item (min.)",
+      "valor": "2"
+    },
+    {
+      "parametro": "Limite lote pequeno dobra (pç)",
+      "valor": "5"
+    },
+    {
+      "parametro": "Adicional lote pequeno dobra",
+      "valor": "0.3"
+    }
+  ],
+  "workCenters": [
+    {
+      "processo": "Laser",
+      "metodo": "Tempo",
+      "custo": 360
+    },
+    {
+      "processo": "Dobra",
+      "metodo": "Tempo",
+      "custo": 260
+    },
+    {
+      "processo": "Calandra",
+      "metodo": "Tempo",
+      "custo": 240
+    },
+    {
+      "processo": "Calandra",
+      "metodo": "Peso",
+      "custo": 1.8
+    },
+    {
+      "processo": "Solda",
+      "metodo": "Tempo",
+      "custo": 160
+    },
+    {
+      "processo": "Guilhotina",
+      "metodo": "Tempo",
+      "custo": 200
+    }
+  ],
+  "standardSheets": [
+    {
+      "codigo": "CH1200",
+      "largura": 1200,
+      "comprimento": 3000
+    },
+    {
+      "codigo": "CH1500",
+      "largura": 1500,
+      "comprimento": 3000
+    }
+  ],
+  "erpMap": [
+    {
+      "codigo": "2",
+      "operacao": "Corte laser",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "3",
+      "operacao": "Guilhotina",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "4",
+      "operacao": "Plasma",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "5",
+      "operacao": "Dobra",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "7",
+      "operacao": "Prensa",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "8",
+      "operacao": "Chanfro",
+      "referencia": "Operacoes_ERP"
+    },
+    {
+      "codigo": "9",
+      "operacao": "Solda",
+      "referencia": "Operacoes_ERP"
+    }
+  ],
+  "largePieceLossRules": [
+    {
+      "limiteUso": 60,
+      "percentualPerda": 15,
+      "ativo": "Sim"
+    }
+  ],
+  "utilizationIncrements": [
+    {
+      "aproveitamento": 0.5,
+      "acrescimo": 0.3
+    },
+    {
+      "aproveitamento": 0.6,
+      "acrescimo": 0.15
+    },
+    {
+      "aproveitamento": 0.7,
+      "acrescimo": 0.1
+    },
+    {
+      "aproveitamento": 0.8,
+      "acrescimo": 0.06
+    },
+    {
+      "aproveitamento": 0.85,
+      "acrescimo": 0.04
+    },
+    {
+      "aproveitamento": 0.9,
+      "acrescimo": 0.02
+    },
+    {
+      "aproveitamento": 0.95,
+      "acrescimo": 0
+    }
+  ],
+  "taxScenarios": [
+    {
+      "codigo": "LEGADO",
+      "descricao": "Sistema atual / parâmetro comercial",
+      "inicio": "",
+      "fim": "",
+      "ativo": "Sim",
+      "pisCofins": 0.0365,
+      "icmsIss": 0.1335,
+      "cbs": 0,
+      "ibs": 0,
+      "ipi": 0.05,
+      "creditoCBS": 0,
+      "creditoIBS": 0,
+      "tratamento": "Legado",
+      "observacao": "Mantém a carga comercial total de 17% já usada no orçamento."
+    },
+    {
+      "codigo": "TRANSICAO_2026",
+      "descricao": "Ano-teste IBS/CBS",
+      "inicio": "2026-01-01",
+      "fim": "2026-12-31",
+      "ativo": "Sim",
+      "pisCofins": 0.0365,
+      "icmsIss": 0.1335,
+      "cbs": 0.009,
+      "ibs": 0.001,
+      "ipi": 0,
+      "creditoCBS": 1,
+      "creditoIBS": 1,
+      "tratamento": "Transição",
+      "observacao": "Campos IBS/CBS para simulação gerencial e destaque conforme regras aplicáveis."
+    },
+    {
+      "codigo": "REFORMA_PADRAO",
+      "descricao": "Cenário futuro configurável",
+      "inicio": "",
+      "fim": "",
+      "ativo": "Sim",
+      "pisCofins": 0,
+      "icmsIss": 0,
+      "cbs": 0,
+      "ibs": 0,
+      "ipi": 0,
+      "creditoCBS": 1,
+      "creditoIBS": 1,
+      "tratamento": "CBS/IBS",
+      "observacao": "Preencher alíquotas aprovadas e vigentes antes da utilização."
+    },
+    {
+      "codigo": "EXPORTACAO",
+      "descricao": "Operação de exportação",
+      "inicio": "",
+      "fim": "",
+      "ativo": "Sim",
+      "pisCofins": 0,
+      "icmsIss": 0,
+      "cbs": 0,
+      "ibs": 0,
+      "ipi": 0,
+      "creditoCBS": 1,
+      "creditoIBS": 1,
+      "tratamento": "Desoneração",
+      "observacao": "Confirmar regras e manutenção de créditos com a assessoria fiscal."
+    }
+  ],
+  "operationNatures": [
+    {
+      "codigo": "VENDA_IND",
+      "codigoERP": "",
+      "origemMaterial": "Danfer",
+      "modeloOP": "Venda",
+      "exigeRemessa": "Não",
+      "exigeFornecedor": "Não",
+      "natureza": "Venda para industrialização",
+      "tipo": "Venda",
+      "cenario": "LEGADO",
+      "cfop": "5101/6101",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Sim",
+      "consumidorFinal": "Não",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Validar CFOP conforme UF e operação."
+    },
+    {
+      "codigo": "INDUSTRIALIZACAO",
+      "codigoERP": "",
+      "origemMaterial": "Cliente",
+      "modeloOP": "Serviço",
+      "exigeRemessa": "Sim",
+      "exigeFornecedor": "Não",
+      "natureza": "Industrialização por encomenda",
+      "tipo": "Serviço",
+      "cenario": "LEGADO",
+      "cfop": "5124/6124",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Sim",
+      "consumidorFinal": "Não",
+      "industrializacao": "Sim",
+      "ativo": "Sim",
+      "observacao": "Separar insumos próprios e recebidos do cliente."
+    },
+    {
+      "codigo": "CONTA_ORDEM",
+      "codigoERP": "",
+      "origemMaterial": "Fornecedor do cliente",
+      "modeloOP": "Serviço",
+      "exigeRemessa": "Sim",
+      "exigeFornecedor": "Sim",
+      "natureza": "Industrialização por conta e ordem",
+      "tipo": "Serviço",
+      "cenario": "LEGADO",
+      "cfop": "5124/6124",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Sim",
+      "consumidorFinal": "Não",
+      "industrializacao": "Sim",
+      "ativo": "Sim",
+      "observacao": "Material comprado pelo cliente e remetido diretamente por fornecedor. Validar documentação fiscal e vínculos de remessa."
+    },
+    {
+      "codigo": "USO_CONSUMO",
+      "codigoERP": "",
+      "origemMaterial": "Danfer",
+      "modeloOP": "Venda",
+      "exigeRemessa": "Não",
+      "exigeFornecedor": "Não",
+      "natureza": "Venda para uso e consumo",
+      "tipo": "Venda",
+      "cenario": "LEGADO",
+      "cfop": "5101/6101",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Conforme regra",
+      "consumidorFinal": "Sim",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Informar destino da mercadoria."
+    },
+    {
+      "codigo": "REVENDA",
+      "codigoERP": "",
+      "natureza": "Revenda de mercadoria",
+      "tipo": "Venda",
+      "cenario": "LEGADO",
+      "cfop": "5102/6102",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Sim",
+      "consumidorFinal": "Não",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Usar cadastro específico de mercadoria."
+    },
+    {
+      "codigo": "ATIVO",
+      "codigoERP": "",
+      "natureza": "Venda destinada ao ativo imobilizado",
+      "tipo": "Venda",
+      "cenario": "LEGADO",
+      "cfop": "5101/6101",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Sim",
+      "permiteCredito": "Conforme regra",
+      "consumidorFinal": "Sim",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Confirmar crédito do adquirente."
+    },
+    {
+      "codigo": "EXPORTACAO",
+      "codigoERP": "",
+      "natureza": "Exportação",
+      "tipo": "Venda",
+      "cenario": "EXPORTACAO",
+      "cfop": "7101",
+      "ncmObrigatorio": "Sim",
+      "geraDebito": "Não",
+      "permiteCredito": "Sim",
+      "consumidorFinal": "Não",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Tratamento desonerado sujeito à documentação."
+    },
+    {
+      "codigo": "REMESSA",
+      "codigoERP": "",
+      "natureza": "Remessa sem faturamento",
+      "tipo": "Ambos",
+      "cenario": "LEGADO",
+      "cfop": "Conforme caso",
+      "ncmObrigatorio": "Conforme caso",
+      "geraDebito": "Não",
+      "permiteCredito": "Não",
+      "consumidorFinal": "Não",
+      "industrializacao": "Não",
+      "ativo": "Sim",
+      "observacao": "Não gera preço comercial."
+    },
+    {
+      "codigo": "RETORNO",
+      "codigoERP": "",
+      "natureza": "Retorno de industrialização",
+      "tipo": "Serviço",
+      "cenario": "LEGADO",
+      "cfop": "5902/6902",
+      "ncmObrigatorio": "Conforme caso",
+      "geraDebito": "Conforme caso",
+      "permiteCredito": "Conforme caso",
+      "consumidorFinal": "Não",
+      "industrializacao": "Sim",
+      "ativo": "Sim",
+      "observacao": "Vincular à remessa recebida."
+    }
+  ]
+}

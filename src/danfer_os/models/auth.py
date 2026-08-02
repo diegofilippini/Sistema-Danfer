@@ -12,6 +12,7 @@ class UserRole(StrEnum):
     ENGINEERING = "engenharia"
     PRODUCTION = "producao"
     QUALITY = "qualidade"
+    COST_ANALYST = "analista_custos"
     VIEWER = "consulta"
 
 

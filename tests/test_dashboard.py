@@ -75,3 +75,36 @@ def test_empty_dashboard() -> None:
     assert dashboard["technical_parts"] == 0
     assert dashboard["orders_by_status"] == []
     assert dashboard["next_orders"] == []
+
+
+def test_delivery_board_period_colors_and_top_ten_clients() -> None:
+    client = TestClient(create_app(TechnicalLibrary()))
+    product = add_part(client, "PAINEL-ENTREGA")
+    component = add_part(client, "CHAPA-ENTREGA", "Aço carbono")
+    bom = client.post("/api/v1/boms", json={
+        "product_id": product["id"], "components": [{"part_id": component["id"], "quantity": 1}],
+    }).json()
+
+    def order(name: str, due_date: date) -> None:
+        response = client.post("/api/v1/pcp/orders", json={
+            "product_id": product["id"], "bom_id": bom["id"], "quantity": 1,
+            "due_date": str(due_date), "client_name": name,
+        })
+        assert response.status_code == 201
+
+    order("Cliente Atrasado", date.today() - timedelta(days=1))
+    for index in range(11):
+        order(f"Cliente Hoje {index:02d}", date.today())
+    order("Cliente Futuro", date.today() + timedelta(days=2))
+
+    response = client.get("/api/v1/dashboard/deliveries", params={"days": 14})
+    assert response.status_code == 200
+    board = response.json()
+    assert len(board["columns"]) == 15
+    assert board["columns"][0]["status"] == "red"
+    assert board["columns"][0]["clients"][0]["client"] == "Cliente Atrasado"
+    assert board["columns"][1]["status"] == "yellow"
+    assert len(board["columns"][1]["clients"]) == 10
+    assert board["columns"][3]["status"] == "green"
+    assert board["columns"][3]["clients"][0]["client"] == "Cliente Futuro"
+    assert client.get("/api/v1/dashboard/deliveries", params={"days": 8}).status_code == 422

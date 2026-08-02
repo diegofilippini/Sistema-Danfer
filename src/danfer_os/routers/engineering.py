@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from danfer_os.models.engineering import (
     DxfAnalysis, DxfQuoteDraftRequest, DxfRegistration, DxfUpload, NestingBatchPlan, NestingPlan,
+    PdfDrawingAnalysis, PdfDrawingConfirmation, PdfDrawingUpload,
     NestingRequest, NestingSheet,
 )
 from danfer_os.models.commercial import QuoteItemCreate
@@ -56,6 +57,26 @@ def create_router(service: EngineeringService, library: TechnicalLibrary, commer
             return [service.analyze(upload) for upload in uploads]
         except DxfAnalysisError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.post("/pdf/analyze", response_model=PdfDrawingAnalysis)
+    def analyze_pdf(upload: PdfDrawingUpload) -> PdfDrawingAnalysis:
+        try:
+            return service.analyze_pdf(upload)
+        except DxfAnalysisError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.post("/pdf/confirm-quote-item", response_model=QuoteItemCreate)
+    def confirm_pdf_item(data: PdfDrawingConfirmation) -> QuoteItemCreate:
+        if not data.confirmed:
+            raise HTTPException(status_code=422, detail="o orçamentista deve confirmar as medidas")
+        perimeter = data.cut_length_mm or 2 * (data.width_mm + data.height_mm)
+        return QuoteItemCreate(
+            code=data.code, description=data.description, quantity=data.quantity,
+            material=data.material, thickness_mm=data.thickness_mm,
+            width_mm=data.width_mm, length_mm=data.height_mm,
+            cut_length_mm=perimeter,
+            notes=f"Medidas confirmadas manualmente a partir de {data.filename}.",
+        )
 
     @router.post("/dxf/register", response_model=TechnicalDocument, status_code=201)
     def register_dxf(data: DxfRegistration) -> TechnicalDocument:

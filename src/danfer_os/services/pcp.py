@@ -40,6 +40,7 @@ class PcpService:
         2: "Corte Laser", 3: "Guilhotina", 4: "Plasma", 5: "Dobra",
         6: "Calandra", 7: "Prensa", 8: "Chanfro", 9: "Solda",
     }
+    _default_hourly_rates = {2: 360, 3: 200, 5: 260, 6: 240, 9: 160}
     _transitions = {
         ProductionStatus.PLANNED: {ProductionStatus.RELEASED, ProductionStatus.CANCELLED},
         ProductionStatus.RELEASED: {ProductionStatus.IN_PROGRESS, ProductionStatus.CANCELLED},
@@ -60,7 +61,7 @@ class PcpService:
         self._sequence = 0
         self._storage_path = storage_path
         self._work_centers: dict[int, WorkCenter] = {
-            code: WorkCenter(operation_erp_code=code, name=name)
+            code: WorkCenter(operation_erp_code=code, name=name, hourly_rate=self._default_hourly_rates.get(code, 0))
             for code, name in self._default_operations.items()
         }
         self._calendar: dict[date, CalendarException] = {}
@@ -109,6 +110,7 @@ class PcpService:
         item = DirectProductionRequest(
             **data.model_dump(),
             number=f"SP-{datetime.now():%Y}-{self._direct_request_sequence:05d}",
+            total_value=round(sum(row.quantity * row.unit_price for row in data.items), 2),
         )
         self._direct_requests[item.id] = item
         self._save()
@@ -148,9 +150,10 @@ class PcpService:
                 )
             )
         self._sequence += 1
+        values = data.model_dump(exclude={"number_override"})
         order = ProductionOrder(
-            **data.model_dump(),
-            number=f"OP-{datetime.now():%Y}-{self._sequence:05d}",
+            **values,
+            number=data.number_override or f"OP-{datetime.now():%Y}-{self._sequence:05d}",
             requirements=requirements,
         )
         self._orders[order.id] = order

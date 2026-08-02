@@ -10,6 +10,7 @@ from ezdxf import bbox
 from danfer_os.models.engineering import (
     DxfAnalysis, DxfQuoteDraftRequest, DxfUpload, NestingPart, NestingPlacement,
     NestingBatchPlan, NestingPlan, NestingRequest, NestingSheet, NestingSuggestion, SheetEvaluation,
+    PdfDimensionCandidate, PdfDrawingAnalysis, PdfDrawingUpload,
 )
 from danfer_os.models.commercial import QuoteItemCreate, QuoteProcess
 
@@ -24,6 +25,59 @@ class EngineeringService:
         re.compile(r"(?:^|[-_ ])X(\d+)(?:$|[-_ .])", re.IGNORECASE),
         re.compile(r"\[(\d+)\]"),
     ]
+
+    @staticmethod
+    def analyze_pdf(upload: PdfDrawingUpload) -> PdfDrawingAnalysis:
+        try:
+            import pymupdf
+            content = base64.b64decode(upload.content_base64, validate=True)
+            if len(content) > 25 * 1024 * 1024:
+                raise DxfAnalysisError("PDF excede o limite de 25 MB")
+            reader = pymupdf.open(stream=content, filetype="pdf")
+            if not reader.page_count:
+                raise DxfAnalysisError("PDF sem páginas")
+            text = "\n".join(page.get_text("text") or "" for page in reader)
+        except DxfAnalysisError:
+            raise
+        except ImportError as error:
+            raise DxfAnalysisError("leitor de PDF não instalado no servidor") from error
+        except Exception as error:
+            raise DxfAnalysisError("arquivo PDF inválido ou protegido") from error
+        normalized = text.replace(",", ".")
+        pair_pattern = re.compile(r"(?<!\d)(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)\s*(mm|cm|m)?", re.IGNORECASE)
+        single_pattern = re.compile(r"(?:Ø|R|RAIO|DIM\.?|MEDIDA)?\s*(\d+(?:\.\d+)?)\s*(mm|cm|m)\b", re.IGNORECASE)
+        factors = {"mm": 1, "cm": 10, "m": 1000, None: 1}
+        dimensions: list[PdfDimensionCandidate] = []
+        width = height = None
+        pairs = list(pair_pattern.finditer(normalized))
+        if pairs:
+            match = max(pairs, key=lambda item: float(item.group(1)) * float(item.group(2)))
+            factor = factors.get((match.group(3) or "mm").lower(), 1)
+            width, height = float(match.group(1)) * factor, float(match.group(2)) * factor
+            dimensions.extend([
+                PdfDimensionCandidate(label=match.group(0), value_mm=width, kind="largura", confidence_percent=85),
+                PdfDimensionCandidate(label=match.group(0), value_mm=height, kind="altura", confidence_percent=85),
+            ])
+        for match in single_pattern.finditer(normalized):
+            factor = factors.get(match.group(2).lower(), 1)
+            value = float(match.group(1)) * factor
+            if value > 0 and not any(abs(item.value_mm - value) < .001 for item in dimensions):
+                dimensions.append(PdfDimensionCandidate(label=match.group(0), value_mm=value, kind="cota", confidence_percent=65))
+            if len(dimensions) >= 30:
+                break
+        source_type = "vetorial/texto" if text.strip() else "imagem digitalizada"
+        warnings = ["Confirmação obrigatória: cotas do PDF não substituem o DXF/DWG para cálculo definitivo."]
+        if not text.strip():
+            warnings.append("PDF sem texto extraível; será necessário OCR e uma medida de referência.")
+        elif width is None:
+            warnings.append("Não foi identificado um par largura × altura; informe as medidas manualmente.")
+        if upload.reference_dimension_mm:
+            warnings.append("Medida de referência registrada; confirme a escala visual antes de aplicar.")
+        return PdfDrawingAnalysis(
+            filename=upload.filename, page_count=reader.page_count, source_type=source_type,
+            width_mm=width, height_mm=height, dimensions=dimensions,
+            extracted_text=text[:4000], warnings=warnings,
+        )
 
     @classmethod
     def analyze(cls, upload: DxfUpload) -> DxfAnalysis:

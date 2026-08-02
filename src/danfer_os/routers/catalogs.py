@@ -1,11 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from danfer_os.models.catalogs import (
     Material, MaterialCreate, MaterialUpdate, Operation, OperationUpdate, QuoteMaterialOption,
+    PriceTableImportResult, PriceTableMapping,
     RoutingTemplate, RoutingTemplateCreate, RoutingTemplateUpdate,
 )
+from danfer_os.models.importer import FileUpload, ImportPreview
 from danfer_os.services.catalogs import CatalogNotFoundError, CatalogService
 
 
@@ -36,6 +38,36 @@ def create_router(service: CatalogService) -> APIRouter:
             return service.update_material(material_id, data)
         except CatalogNotFoundError as error:
             raise HTTPException(status_code=404, detail="material não encontrado") from error
+
+    @router.delete("/materials/{material_id}", status_code=204)
+    def delete_material(material_id: UUID) -> None:
+        try:
+            service.delete_material(material_id)
+        except CatalogNotFoundError as error:
+            raise HTTPException(status_code=404, detail="material não encontrado") from error
+
+    @router.post("/materials/price-table/preview", response_model=ImportPreview, status_code=201)
+    def preview_price_table(data: FileUpload) -> ImportPreview:
+        try:
+            return service.preview_price_table(data)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.post("/materials/price-table/{session_id}/apply", response_model=PriceTableImportResult)
+    def apply_price_table(
+        session_id: UUID, data: PriceTableMapping, request: Request
+    ) -> PriceTableImportResult:
+        user = getattr(request.state, "user", None)
+        try:
+            return service.apply_price_table(session_id, data, user.name if user else "")
+        except CatalogNotFoundError as error:
+            raise HTTPException(status_code=404, detail="sessão de importação não encontrada") from error
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+
+    @router.get("/materials/price-table/history", response_model=list[PriceTableImportResult])
+    def price_table_history() -> list[PriceTableImportResult]:
+        return service.price_import_history()
 
     @router.get("/operations", response_model=list[Operation])
     def list_operations(active: bool | None = None) -> list[Operation]:
