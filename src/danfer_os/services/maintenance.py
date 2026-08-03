@@ -7,6 +7,12 @@ from threading import RLock
 
 
 CRM_DEFAULTS = {
+    "paymentTerms": [
+        {"codigo": "AVISTA", "descricao": "À vista", "ativo": "Sim"},
+        {"codigo": "28DDL", "descricao": "28 dias", "ativo": "Sim"},
+        {"codigo": "28_35_42DDL", "descricao": "28/35/42 dias", "ativo": "Sim"},
+        {"codigo": "30_60DDL", "descricao": "30/60 dias", "ativo": "Sim"},
+    ],
     "laserParameters": [{"parametro": "Margem adicional no tempo de laser", "valor": 50, "unidade": "%", "ativo": "Sim"}],
     "crmStages": [
         {"ordem": 1, "nome": "Em elaboração", "cor": "#64748b", "probabilidade": 10, "prazoDias": 0, "tipo": "Aberta", "exigeMotivo": "Não", "ativo": "Sim"},
@@ -53,7 +59,7 @@ class MaintenanceService:
         # Correções aprovadas na consolidação: a densidade 780 era erro de
         # digitação e existem somente duas chapas padrão oficiais.
         for material in self._data.get("materials", []):
-            if float(material.get("espessura", 0)) == 1.06 and str(material.get("material", "")).casefold() == "aço carbono":
+            if float(material.get("densidade", 0)) < 5000:
                 material["densidade"] = 7850
         self._data["standardSheets"] = [
             {"codigo": "CH1200", "largura": 1200.0, "comprimento": 3000.0},

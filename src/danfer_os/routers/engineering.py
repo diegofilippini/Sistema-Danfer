@@ -13,9 +13,10 @@ from danfer_os.models.technical_document import DocumentCategory, DocumentCreate
 from danfer_os.services.engineering import DxfAnalysisError, EngineeringService
 from danfer_os.services.technical_library import TechnicalLibrary
 from danfer_os.services.commercial import CommercialService
+from danfer_os.services.catalogs import CatalogService
 
 
-def create_router(service: EngineeringService, library: TechnicalLibrary, commercial: CommercialService | None = None) -> APIRouter:
+def create_router(service: EngineeringService, library: TechnicalLibrary, commercial: CommercialService | None = None, catalog: CatalogService | None = None) -> APIRouter:
     router = APIRouter(prefix="/engineering", tags=["engenharia"])
 
     def resolved_nesting(data: NestingRequest) -> NestingRequest:
@@ -142,6 +143,17 @@ def create_router(service: EngineeringService, library: TechnicalLibrary, commer
     @router.post("/dxf/quote-drafts", response_model=list[QuoteItemCreate])
     def dxf_quote_drafts(data: DxfQuoteDraftRequest) -> list[QuoteItemCreate]:
         try:
+            if data.material_id is not None:
+                selected = next((item for item in (catalog.list_materials(active=True) if catalog else []) if item.id == data.material_id), None)
+                if selected is None:
+                    raise DxfAnalysisError("material configurado não encontrado")
+                data = data.model_copy(update={
+                    "material": selected.description,
+                    "thickness_mm": selected.thickness_mm,
+                    "material_price_kg": selected.price_per_kg,
+                    "density_kg_m3": selected.density_kg_m3,
+                    "cutting_speed_mm_min": selected.laser_speed_mm_min or selected.plasma_speed_mm_min or 2000,
+                })
             return service.quote_drafts(data)
         except DxfAnalysisError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error

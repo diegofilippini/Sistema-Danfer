@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import json
+from pathlib import Path
 from uuid import UUID
 
 from danfer_os.models.bom import (
@@ -21,9 +23,21 @@ class BomValidationError(ValueError):
 
 
 class BomService:
-    def __init__(self, library: TechnicalLibrary) -> None:
+    def __init__(self, library: TechnicalLibrary, storage_path: Path | None = None) -> None:
         self._library = library
         self._boms: dict[UUID, BillOfMaterials] = {}
+        self._storage_path = storage_path
+        if storage_path and storage_path.exists():
+            data = json.loads(storage_path.read_text(encoding="utf-8"))
+            self._boms = {item.id: item for item in map(BillOfMaterials.model_validate, data.get("boms", []))}
+
+    def _save(self) -> None:
+        if self._storage_path is None:
+            return
+        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+        self._storage_path.write_text(json.dumps({"version": 1, "boms": [
+            item.model_dump(mode="json") for item in self._boms.values()
+        ]}, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _validate(self, data: BomCreate, ignored_bom_id: UUID | None = None) -> None:
         try:
@@ -49,6 +63,7 @@ class BomService:
         except BomValidationError:
             self._boms.pop(bom.id, None)
             raise
+        self._save()
         return bom.model_copy(deep=True)
 
     def list(self) -> list[BillOfMaterials]:
@@ -76,11 +91,13 @@ class BomService:
         except BomValidationError:
             self._boms[bom_id] = current
             raise
+        self._save()
         return updated.model_copy(deep=True)
 
     def delete(self, bom_id: UUID) -> None:
         if self._boms.pop(bom_id, None) is None:
             raise BomNotFoundError(bom_id)
+        self._save()
 
     def _for_product(self, product_id: UUID) -> BillOfMaterials | None:
         candidates = [

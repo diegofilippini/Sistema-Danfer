@@ -142,6 +142,37 @@ def test_material_cut_speed_is_editable_applied_and_material_can_be_deleted(tmp_
     assert client.get("/api/v1/catalogs/materials").json() == []
 
 
+def test_quote_calculates_weight_perimeter_and_laser_time_from_material(tmp_path: Path) -> None:
+    client = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
+    client.post("/api/v1/catalogs/materials", json={
+        "erp_code": "AC-2-AUTO", "description": "Aço automático",
+        "thickness_mm": 2, "price_per_kg": 8, "density_kg_m3": 7850,
+        "laser_speed_mm_min": 1000,
+    })
+    customer = client.post("/api/v1/commercial/clients", json={"name": "Cliente Automático"}).json()
+    quote = client.post("/api/v1/commercial/quotes", json={
+        "type": "venda", "client_id": customer["id"],
+        "valid_until": str(date.today() + timedelta(days=10)),
+        "items": [{"code": "AUTO-1", "description": "Retângulo", "quantity": 2,
+                   "material": "Aço automático", "thickness_mm": 2,
+                   "width_mm": 100, "length_mm": 50,
+                   "processes": [{"name": "Corte Laser", "minutes": 0, "hourly_rate": 0}]}],
+    })
+    assert quote.status_code == 201
+    item = quote.json()["items"][0]
+    assert item["net_weight_kg"] == 0.0785
+    assert item["cut_length_mm"] == 300
+    assert item["laser_estimated_minutes"] == 0.3
+    assert item["material_cost"] > 0
+    assert item["process_cost"] > 0
+
+
+def test_primary_routing_templates_are_first_and_support_expected_initials(tmp_path: Path) -> None:
+    client = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
+    names = [item["name"] for item in client.get("/api/v1/catalogs/quote-routing-templates").json()]
+    assert names[:3] == ["Laser", "Laser + Dobra", "Laser + Dobra + Calandra"]
+
+
 def test_dxf_registration_creates_searchable_technical_record(tmp_path: Path) -> None:
     document = ezdxf.new()
     document.modelspace().add_lwpolyline([(0, 0), (80, 0), (80, 40), (0, 40)], close=True)
@@ -161,3 +192,28 @@ def test_dxf_registration_creates_searchable_technical_record(tmp_path: Path) ->
     assert item["cut_length_mm"] == 240
     assert item["routing"][0]["erp_code"] == 2
     assert client.get("/api/v1/technical-library", params={"q": "DF-DXF-001"}).json()["total"] == 1
+
+
+def test_dxf_quote_import_resolves_all_material_parameters_from_maintenance(tmp_path: Path) -> None:
+    document = ezdxf.new()
+    document.modelspace().add_lwpolyline([(0, 0), (100, 0), (100, 50), (0, 50)], close=True)
+    stream = io.StringIO()
+    document.write(stream)
+    client = TestClient(create_app(TechnicalLibrary(), data_dir=tmp_path))
+    material = client.post("/api/v1/catalogs/materials", json={
+        "erp_code": "AC-2", "description": "Aço carbono", "thickness_mm": 2,
+        "price_per_kg": 7.5, "density_kg_m3": 7850, "laser_speed_mm_min": 1500,
+    }).json()
+    response = client.post("/api/v1/engineering/dxf/quote-drafts", json={
+        "uploads": [{"filename": "Peca_QTD3.dxf",
+                     "content_base64": base64.b64encode(stream.getvalue().encode()).decode()}],
+        "material_id": material["id"], "thickness_mm": 2,
+    })
+    assert response.status_code == 200
+    item = response.json()[0]
+    assert item["material"] == "Aço carbono"
+    assert item["quantity"] == 3
+    assert item["material_price_kg"] == 7.5
+    assert item["net_weight_kg"] > 0
+    expected_minutes = item["cut_length_mm"] / 1500 + item["piercings"] / 60
+    assert item["laser_estimated_minutes"] == round(expected_minutes, 3)

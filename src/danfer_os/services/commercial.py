@@ -193,6 +193,26 @@ class CommercialService:
         compatible_item_count: int,
         batch_plan: NestingBatchPlan | None = None,
     ) -> QuoteItem:
+        selected = None
+        if self._catalog_service is not None:
+            candidates = self._catalog_service.list_materials(data.material, True)
+            selected = next((item for item in candidates if (
+                item.description.casefold() == data.material.casefold()
+                and (data.thickness_mm is None or item.thickness_mm == data.thickness_mm)
+            )), None)
+        automatic_updates = {}
+        if selected and not data.thickness_mm:
+            automatic_updates["thickness_mm"] = selected.thickness_mm
+        effective_thickness = data.thickness_mm or (selected.thickness_mm if selected else None)
+        if not data.net_weight_kg and data.width_mm and data.length_mm and effective_thickness and selected:
+            automatic_updates["net_weight_kg"] = (
+                data.width_mm * data.length_mm * effective_thickness
+                * selected.density_kg_m3 / 1_000_000_000
+            )
+        if not data.cut_length_mm and data.width_mm and data.length_mm:
+            automatic_updates["cut_length_mm"] = 2 * (data.width_mm + data.length_mm)
+        if automatic_updates:
+            data = data.model_copy(update=automatic_updates)
         utilization = max(
             data.utilization_percent
             if data.utilization_percent is not None
@@ -306,13 +326,7 @@ class CommercialService:
         if large_part_loss and calculation_source in {"administrativo", "estimativa_retangular"}:
             material_consumption *= 1 + self._settings.large_part_loss_percent / 100
         material_price = data.material_price_kg
-        selected = None
-        if material_price is None and self._catalog_service is not None:
-            candidates = self._catalog_service.list_materials(data.material, True)
-            selected = next((item for item in candidates if (
-                item.description.casefold() == data.material.casefold()
-                and (data.thickness_mm is None or item.thickness_mm == data.thickness_mm)
-            )), None)
+        if material_price is None:
             material_price = selected.price_per_kg if selected else 0
         material_price = material_price or 0
         material_cost = (
@@ -515,6 +529,22 @@ class CommercialService:
             self._revisions[quote.id] = []
             self._save()
         return quote.model_copy(deep=True)
+
+    def preview_quote(self, data: QuoteCreate) -> Quote:
+        """Calcula a proposta com as regras reais sem gravar ou consumir numeração."""
+        self.get_client(data.client_id)
+        updates = {}
+        if data.margin_percent is None:
+            updates["margin_percent"] = self._settings.default_margin_percent
+        if data.ipi_percent is None:
+            updates["ipi_percent"] = self._settings.default_ipi_percent
+        if data.cbs_percent is None:
+            updates["cbs_percent"] = self._settings.default_cbs_percent
+        if data.ibs_percent is None:
+            updates["ibs_percent"] = self._settings.default_ibs_percent
+        if updates:
+            data = data.model_copy(update=updates)
+        return self._calculate_quote(data, "PRÉVIA")
 
     def list_quotes(
         self,

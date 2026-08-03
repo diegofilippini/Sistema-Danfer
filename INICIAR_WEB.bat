@@ -9,5 +9,6 @@ if not exist ".venv\Scripts\python.exe" (
 )
 start "" http://127.0.0.1:8000
 set DANFER_SEED_DEMO=1
+set DANFER_SKIP_FIRST_PASSWORD_CHANGE=1
 .venv\Scripts\python.exe -m uvicorn danfer_os.main:app --host 127.0.0.1 --port 8000
 pause

@@ -91,6 +91,13 @@ def create_router(service: CommercialService) -> APIRouter:
         except CommercialNotFoundError as error:
             raise HTTPException(status_code=422, detail="cliente não encontrado") from error
 
+    @router.post("/quotes/preview", response_model=Quote)
+    def preview_quote(data: QuoteCreate) -> Quote:
+        try:
+            return service.preview_quote(data)
+        except CommercialNotFoundError as error:
+            raise HTTPException(status_code=422, detail="cliente não encontrado") from error
+
     @router.get("/quotes", response_model=list[Quote])
     def list_quotes(
         quote_status: QuoteStatus | None = Query(default=None, alias="status"),

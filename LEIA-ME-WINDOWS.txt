@@ -1,4 +1,4 @@
-DANFER INDUSTRIAL OS 1.6.0 - VERSAO WEB LOCAL
+DANFER INDUSTRIAL OS 1.7.8 - VERSAO WEB LOCAL PARA TESTES
 
 1. Extraia todo o conteudo deste ZIP para uma pasta.
 2. Execute "INICIAR_WEB.bat".
@@ -18,3 +18,7 @@ Senha: Danfer@2026
 
 Na primeira execucao, o sistema cria dados demonstrativos para facilitar a
 avaliacao dos modulos.
+
+INTEGRACAO ERP
+Configure primeiro em Integracoes. A transmissao externa permanece desativada
+ate que URL, credenciais e codigos do ERP de homologacao sejam informados.

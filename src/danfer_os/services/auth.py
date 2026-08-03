@@ -21,13 +21,17 @@ VALID_PERMISSIONS = {
 
 
 class AuthService:
-    def __init__(self, storage_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        storage_path: Path | None = None,
+        require_initial_password_change: bool = True,
+    ) -> None:
         self._storage_path = storage_path
         self._users: dict[UUID, tuple[User, str]] = {}
         self._sessions: dict[str, UUID] = {}
         self._load()
         if not self._users:
-            self.create_user(
+            created = self.create_user(
                 UserCreate(
                     username="admin",
                     name="Administrador Danfer",
@@ -35,6 +39,20 @@ class AuthService:
                     role=UserRole.ADMIN,
                 )
             )
+            if not require_initial_password_change:
+                self._set_password_change_requirement(created.id, False)
+        elif not require_initial_password_change:
+            for user_id, (user, _) in list(self._users.items()):
+                if user.must_change_password:
+                    self._set_password_change_requirement(user_id, False)
+
+    def _set_password_change_requirement(self, user_id: UUID, required: bool) -> None:
+        user, password_hash = self._users[user_id]
+        self._users[user_id] = (
+            user.model_copy(update={"must_change_password": required}),
+            password_hash,
+        )
+        self._save()
 
     @staticmethod
     def _hash(password: str, salt: bytes | None = None) -> str:

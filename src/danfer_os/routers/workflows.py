@@ -12,7 +12,7 @@ from danfer_os.services.bom import BomNotFoundError, BomService
 from danfer_os.services.commercial import CommercialNotFoundError, CommercialService, CommercialValidationError
 from danfer_os.services.pcp import PcpService
 from danfer_os.services.technical_library import TechnicalLibrary
-from danfer_os.models.integrations import ErpEvent
+from danfer_os.models.integrations import ErpEvent, InvoiceFinancialData
 from danfer_os.services.integrations import IntegrationService
 
 BUSINESS_TZ = timezone(timedelta(hours=-3))
@@ -58,6 +58,7 @@ class InvoiceItemRequest(BaseModel):
 
 class InvoiceRequest(BaseModel):
     items: list[InvoiceItemRequest] = Field(min_length=1, max_length=500)
+    financial: InvoiceFinancialData | None = None
 
 
 def create_router(
@@ -218,6 +219,62 @@ def create_router(
             row["percent"] = round(row["completed"] / row["total"] * 100) if row["total"] else 0
         return sorted(grouped.values(), key=lambda item: item["client"].casefold())
 
+    @router.get("/engineering-intelligence")
+    def engineering_intelligence(
+        q: str = "",
+        process: str = "",
+        min_weight_kg: float | None = Query(default=None, ge=0),
+        max_weight_kg: float | None = Query(default=None, ge=0),
+        min_actual_minutes: float | None = Query(default=None, ge=0),
+        max_actual_minutes: float | None = Query(default=None, ge=0),
+    ) -> list[dict]:
+        """Biblioteca consultiva alimentada somente por OPs efetivamente concluídas."""
+        rows: list[dict] = []
+        query = q.strip().casefold()
+        process_query = process.strip().casefold()
+        for order in pcp.list(ProductionStatus.COMPLETED):
+            operation_logs = [
+                log for log in pcp.logs(order.id)
+                if log.type == WorkLogType.OPERATION and log.minutes > 0
+            ]
+            if not operation_logs:
+                continue
+            processes = [step.strip() for step in order.routing_steps if step.strip()]
+            if process_query and not any(process_query in step.casefold() for step in processes):
+                continue
+            actual_minutes = sum(log.minutes for log in operation_logs)
+            if min_actual_minutes is not None and actual_minutes < min_actual_minutes:
+                continue
+            if max_actual_minutes is not None and actual_minutes > max_actual_minutes:
+                continue
+            costs = pcp.costs(order.id)
+            quote_number = order.source_quote_number
+            for item in order.production_items:
+                total_weight = item.quantity * item.unit_weight_kg
+                if min_weight_kg is not None and total_weight < min_weight_kg:
+                    continue
+                if max_weight_kg is not None and total_weight > max_weight_kg:
+                    continue
+                haystack = " ".join((item.code, item.description, order.client_name, order.number, quote_number, *processes)).casefold()
+                if query and query not in haystack:
+                    continue
+                rows.append({
+                    "code": item.code,
+                    "description": item.description,
+                    "client": order.client_name,
+                    "order_number": order.number,
+                    "quote_number": quote_number,
+                    "processes": processes,
+                    "quantity": item.quantity,
+                    "unit_weight_kg": round(item.unit_weight_kg, 3),
+                    "total_weight_kg": round(total_weight, 3),
+                    "actual_minutes": round(actual_minutes, 2),
+                    "actual_minutes_per_unit": round(actual_minutes / item.quantity, 2),
+                    "actual_order_cost": round(costs.actual_total_cost, 2),
+                    "completed_at": order.updated_at,
+                })
+        return sorted(rows, key=lambda row: row["completed_at"], reverse=True)
+
     @router.get("/price-reviews")
     def price_reviews(
         client_id: UUID | None = None,
@@ -368,7 +425,10 @@ def create_router(
     def invoice_quote(quote_id: UUID, data: InvoiceRequest | None = None) -> ErpEvent:
         quote, client, orders = invoice_context(quote_id)
         quantities = selected_quantities(quote, orders, data)
-        event = integrations.queue_invoice(quote, client, quantities)
+        try:
+            event = integrations.queue_invoice(quote, client, quantities, data.financial if data else None)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
         try:
             commercial.register_invoice(quote.id, quantities)
         except CommercialValidationError as error:

@@ -1,4 +1,4 @@
-const CACHE = "danfer-os-1.6.0";
+const CACHE = "danfer-os-1.7.8";
 const ASSETS = ["/", "/styles.css", "/styles-extra.css", "/app.js", "/manifest.json"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
