@@ -1,12 +1,12 @@
 param(
-    [string]$Destination = "..\outputs\Sistema-Danfer-Industrial-OS-1.5.0.zip"
+    [string]$Destination = "..\outputs\Sistema-Danfer-Industrial-OS-1.7.8-Web-Testes.zip"
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $destinationPath = [System.IO.Path]::GetFullPath((Join-Path $projectRoot $Destination))
 $stagingRoot = Join-Path $projectRoot "work\release-staging"
-$packageRoot = Join-Path $stagingRoot "Sistema-Danfer-Industrial-OS-1.5.0"
+$packageRoot = Join-Path $stagingRoot "Sistema-Danfer-Industrial-OS-1.7.8-Web-Testes"
 
 if (Test-Path -LiteralPath $stagingRoot) {
     Remove-Item -LiteralPath $stagingRoot -Recurse -Force
@@ -14,7 +14,7 @@ if (Test-Path -LiteralPath $stagingRoot) {
 New-Item -ItemType Directory -Path $packageRoot -Force | Out-Null
 
 $included = @(
-    "src", "tests", "scripts", "README.md", "LEIA-ME-WINDOWS.txt",
+    "src", "tests", "scripts", "docs", "README.md", "LEIA-ME-WINDOWS.txt",
     "DOCUMENTACAO_OPERACIONAL.md", "MATRIZ_CONSOLIDACAO.md",
     "INICIAR_WEB.bat", "pyproject.toml", ".gitignore"
 )

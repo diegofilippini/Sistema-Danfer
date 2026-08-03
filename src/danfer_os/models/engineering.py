@@ -1,5 +1,7 @@
 from enum import StrEnum
 
+from uuid import UUID
+
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -140,6 +142,7 @@ class NestingBatchPlan(BaseModel):
 
 class DxfQuoteDraftRequest(BaseModel):
     uploads: list[DxfUpload] = Field(min_length=1, max_length=200)
+    material_id: UUID | None = None
     material: str = Field(default="", max_length=100)
     thickness_mm: float = Field(gt=0)
     material_price_kg: float = Field(default=0, ge=0)

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, HTTPException, Query, status
 from danfer_os.models.integrations import (
     ErpEvent,
     ErpEventStatus,
+    ErpConnectionSettings,
     ExternalOrderCreate,
     ImportedOrder,
 )
@@ -48,10 +49,29 @@ def create_router(service: IntegrationService) -> APIRouter:
     ) -> list[ErpEvent]:
         return service.list_events(event_status)
 
+    @router.get("/erp/settings", response_model=ErpConnectionSettings)
+    def get_settings() -> ErpConnectionSettings:
+        return service.settings()
+
+    @router.put("/erp/settings", response_model=ErpConnectionSettings)
+    def update_settings(data: ErpConnectionSettings) -> ErpConnectionSettings:
+        return service.update_settings(data)
+
+    @router.get("/erp/readiness")
+    def readiness() -> dict[str, object]:
+        return service.readiness()
+
     @router.post("/erp/events/{event_id}/ack", response_model=ErpEvent)
     def acknowledge(event_id: UUID, succeeded: bool = True, error: str = "") -> ErpEvent:
         try:
             return service.acknowledge_event(event_id, succeeded, error)
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail="evento não encontrado") from error
+
+    @router.get("/erp/events/{event_id}/validate")
+    def validate_event(event_id: UUID) -> dict[str, object]:
+        try:
+            return service.validate_event(event_id)
         except LookupError as error:
             raise HTTPException(status_code=404, detail="evento não encontrado") from error
 

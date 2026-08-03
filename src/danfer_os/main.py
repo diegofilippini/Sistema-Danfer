@@ -51,10 +51,13 @@ def create_app(
     library = library or TechnicalLibrary(data_dir / "technical-library.json")
     app = FastAPI(
         title="Danfer Industrial OS",
-        version="1.6.0",
+        version="1.7.8",
         description="API central para os módulos industriais da Danfer.",
     )
-    auth_service = AuthService(data_dir / "auth.json")
+    auth_service = AuthService(
+        data_dir / "auth.json",
+        require_initial_password_change=os.getenv("DANFER_SKIP_FIRST_PASSWORD_CHANGE") != "1",
+    )
     if enforce_auth:
         app.middleware("http")(security_middleware(auth_service))
     app.include_router(health_router, prefix="/api/v1")
@@ -62,20 +65,22 @@ def create_app(
         create_router(library),
         prefix="/api/v1",
     )
-    bom_service = BomService(library)
+    bom_service = BomService(library, None if isolated_test_mode else data_dir / "boms.json")
     app.include_router(create_bom_router(bom_service), prefix="/api/v1")
     pcp_service = PcpService(
         library,
         bom_service,
         None if isolated_test_mode else data_dir / "pcp.json",
     )
-    integration_service = IntegrationService(
-        library, None if isolated_test_mode else data_dir / "integrations.json"
-    )
     push_service = PushService(data_dir / "push-subscriptions.json")
     operations_service = OperationsService(data_dir / "operations.json", push_service)
     catalog_service = CatalogService(data_dir / "catalogs.json")
+    integration_service = IntegrationService(
+        library, None if isolated_test_mode else data_dir / "integrations.json", catalog_service
+    )
     maintenance_service = MaintenanceService(data_dir / "maintenance-config.json")
+    if data_dir == Path("data") and not isolated_test_mode:
+        catalog_service.seed_legacy_materials(maintenance_service.get("materials"))
     commercial_service = CommercialService(data_dir / "commercial.json", catalog_service, operations_service)
     if os.getenv("DANFER_SEED_DEMO") == "1":
         seed_demo(
@@ -132,7 +137,7 @@ def create_app(
         prefix="/api/v1",
     )
     app.include_router(
-        create_engineering_router(EngineeringService(), library, commercial_service),
+        create_engineering_router(EngineeringService(), library, commercial_service, catalog_service),
         prefix="/api/v1",
     )
     app.include_router(create_catalogs_router(catalog_service), prefix="/api/v1")

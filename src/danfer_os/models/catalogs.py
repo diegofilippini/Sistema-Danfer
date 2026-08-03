@@ -20,6 +20,12 @@ class MaterialCreate(BaseModel):
     density_kg_m3: float = Field(default=7850, gt=0)
     laser_speed_mm_min: float = Field(default=0, ge=0)
     plasma_speed_mm_min: float = Field(default=0, ge=0)
+    stock_unit: str = Field(default="kg", min_length=1, max_length=10)
+    purchase_unit: str = Field(default="kg", min_length=1, max_length=10)
+    unit_conversion_factor: float = Field(default=1, gt=0)
+    warehouse_erp_code: str = Field(default="", max_length=50)
+    ncm: str = Field(default="", max_length=10)
+    origin_code: str = Field(default="0", max_length=2)
     active: bool = True
 
 
@@ -31,6 +37,12 @@ class MaterialUpdate(BaseModel):
     density_kg_m3: float | None = Field(default=None, gt=0)
     laser_speed_mm_min: float | None = Field(default=None, ge=0)
     plasma_speed_mm_min: float | None = Field(default=None, ge=0)
+    stock_unit: str | None = Field(default=None, min_length=1, max_length=10)
+    purchase_unit: str | None = Field(default=None, min_length=1, max_length=10)
+    unit_conversion_factor: float | None = Field(default=None, gt=0)
+    warehouse_erp_code: str | None = Field(default=None, max_length=50)
+    ncm: str | None = Field(default=None, max_length=10)
+    origin_code: str | None = Field(default=None, max_length=2)
     active: bool | None = None
 
 

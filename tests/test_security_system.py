@@ -1,9 +1,11 @@
 from pathlib import Path
 from datetime import date, timedelta
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from danfer_os.main import create_app
+from danfer_os.services.auth import AuthService
 
 
 def test_auth_enforcement_roles_password_and_backup(tmp_path: Path) -> None:
@@ -178,3 +180,11 @@ def test_commercial_user_cannot_decide_customer_proposal(tmp_path: Path) -> None
     )
     assert denied.status_code == 403
     assert commercial.get(f"/api/v1/commercial/quotes/{quote['id']}").json()["status"] == "aguardando_aprovacao_administrativa"
+
+
+def test_local_test_mode_can_skip_first_password_change(tmp_path: Path) -> None:
+    service = AuthService(tmp_path / "auth.json", require_initial_password_change=False)
+    assert service.login("admin", "Danfer@2026").user.must_change_password is False
+
+    reloaded = AuthService(tmp_path / "auth.json", require_initial_password_change=False)
+    assert reloaded.login("admin", "Danfer@2026").user.must_change_password is False

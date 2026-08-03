@@ -6,8 +6,20 @@
 - **Windows:** execute `INICIAR_WEB.bat`; na primeira execução o ambiente é
   preparado e o navegador é aberto automaticamente.
 
-A versão consolidada é a `1.6.0`, com interface responsiva, persistência local,
+A versão consolidada é a `1.7.4`, com interface responsiva, persistência local,
 controle de acesso por perfil e API integrada.
+
+## Versão 1.7.4 — Cálculos automáticos e roteiros rápidos no orçamento
+
+- cadastro fiscal e financeiro estruturado de clientes;
+- parcelas configuráveis e geração de títulos para boleto;
+- códigos de conta, carteira, centro de custo e categoria financeira;
+- consumo de matérias-primas calculado com aproveitamento/nesting e baixa por depósito;
+- cadastro de unidades, conversão, NCM e origem fiscal dos materiais;
+- configuração administrativa, diagnóstico de prontidão e validação de eventos;
+- faturamento total/parcial com contrato idempotente e histórico preservado.
+
+Veja [docs/INTEGRACAO_ERP.md](docs/INTEGRACAO_ERP.md) para o checklist de homologação.
 
 ### Acesso para testes
 

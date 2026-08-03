@@ -19,14 +19,15 @@ let selectedProductionOrders = new Set();
 let selectedInvoiceQuotes = new Set();
 let invoiceReadyByQuote = new Map();
 let editingQuoteItemIndex = null;
+let dxfImportTarget = "engineering";
 let currentUser = null;
 const accessModules = {
-  dashboard:"Dashboard", crm:"CRM / Clientes", quotes:"OrÃ§amentos", library:"Biblioteca TÃ©cnica",
-  engineering:"Engenharia / DXF", bom:"Estruturas BOM", pcp:"PCP", integrations:"IntegraÃ§Ãµes",
-  coordination:"SolicitaÃ§Ãµes / ComunicaÃ§Ã£o", quality:"Qualidade", maintenance:"ManutenÃ§Ãµes",
-  users:"UsuÃ¡rios", audit:"Auditoria", system:"Backup e restauraÃ§Ã£o"
-  ,"quality-dashboard":"Dashboard qualidade", deviations:"AnÃ¡lise de desvios",
-  "management-dashboard":"Dashboards gerenciais", "monthly-analysis":"AnÃ¡lise mensal"
+  dashboard:"Dashboard", crm:"CRM / Clientes", quotes:"Orçamentos", library:"Biblioteca Técnica",
+  engineering:"Engenharia / Inteligência", bom:"Estruturas BOM", pcp:"PCP", integrations:"Integrações",
+  coordination:"Status", quality:"Qualidade", maintenance:"Manutenções",
+  users:"Usuários", audit:"Auditoria", system:"Backup e restauração"
+  ,"quality-dashboard":"Dashboard qualidade", deviations:"Análise de desvios",
+  "management-dashboard":"Dashboards gerenciais", "monthly-analysis":"Análise mensal"
 };
 const roleAccess = {
   administrador:Object.keys(accessModules),
@@ -38,6 +39,8 @@ const roleAccess = {
   analista_custos:["dashboard","pcp","engineering","library","deviations","monthly-analysis"],
   consulta:["dashboard","library","management-dashboard"]
 };
+const quoteUnitPriceHeader=$("#quote-item-entry")?.closest("table")?.querySelector("th:nth-child(12)");
+if(quoteUnitPriceHeader)quoteUnitPriceHeader.textContent="Preço Unit";
 
 function effectiveAccess(user=currentUser) {
   if (!user) return [];
@@ -193,15 +196,17 @@ async function library(query = "") {
 }
 
 async function bom() {
-  // Os catálogos ficam em uma tela própria, mas compartilham a Biblioteca Técnica.
-  const data = await req("/boms");
+  const [data, libraryData] = await Promise.all([req("/boms"), req("/technical-library")]);
+  const parts=new Map(libraryData.items.map(item=>[item.id,item]));
   $("#boms").innerHTML = table(
-    ["Produto","Revisão","Componentes","Status"],
+    ["Produto","Revisão","Componentes","Status","Ações"],
     data.map(item =>
-      `<tr><td><code>${item.product_id.slice(0,8)}</code></td><td>${esc(item.revision)}</td><td>${item.components.length}</td><td>${pill(item.status)}</td></tr>`
+      `<tr><td><b>${esc(parts.get(item.product_id)?.danfer_code||item.product_id.slice(0,8))}</b><br><small>${esc(parts.get(item.product_id)?.title||"")}</small></td><td>${esc(item.revision)}</td><td>${item.components.length}<br><small>${item.components.map(component=>`${esc(parts.get(component.part_id)?.danfer_code||component.part_id.slice(0,8))} × ${component.quantity}`).join(" · ")}</small></td><td>${pill(item.status)}</td><td><button class="action" onclick="explodeBom('${item.id}')">Explodir</button> <button class="cancel" onclick="deleteBom('${item.id}')">Excluir</button></td></tr>`
     )
   );
 }
+window.explodeBom=async id=>{const quantity=Number(prompt("Quantidade do produto:","1")||1),rows=await req(`/boms/${id}/explosion?quantity=${quantity}`);alert(rows.length?rows.map(row=>`Nível ${row.level}: ${row.part_id.slice(0,8)} — ${row.quantity} ${row.unit}`).join("\n"):"Estrutura sem níveis adicionais.");};
+window.deleteBom=async id=>{if(!confirm("Excluir esta estrutura BOM?"))return;await req(`/boms/${id}`,{method:"DELETE"});await bom();};
 
 async function pcp() {
   const [orders, directRequests, invoiceReady] = await Promise.all([req("/pcp/orders"), req("/pcp/direct-requests"), currentUser?.role==="analista_custos"?Promise.resolve([]):req("/workflows/invoice-ready")]);
@@ -232,7 +237,7 @@ async function pcp() {
   );
   selectedProductionOrders=new Set([...selectedProductionOrders].filter(id=>orders.some(order=>order.id===id)));
   $("#op-archive-table").innerHTML = `<div class="toolbar"><label><input id="select-all-ops" type="checkbox"> Selecionar todas</label><button id="print-selected-ops" type="button">Imprimir OPs selecionadas</button></div>`+table(
-    ["Selecionar","OP","Prazo","Prioridade","Quantidade","Status","AÃ§Ã£o"],
+    ["Selecionar","OP","Prazo","Prioridade","Quantidade","Status","Ação"],
     orders.map(order => `<tr><td><input class="op-selection" type="checkbox" value="${order.id}" ${selectedProductionOrders.has(order.id)?"checked":""}></td><td><b>${esc(order.number)}</b></td><td>${order.due_date}</td><td>${order.priority}</td><td>${order.quantity}</td><td>${pill(order.status)}</td><td><button class="action" onclick="printProductionOrders(['${order.id}'])">Imprimir OP</button> ${nextOrderAction(order)}</td></tr>`)
   );
   document.querySelectorAll(".op-selection").forEach(input=>input.onchange=()=>{input.checked?selectedProductionOrders.add(input.value):selectedProductionOrders.delete(input.value);});
@@ -248,8 +253,8 @@ async function pcp() {
     ["Pedidos diretos", directRequests.filter(item => item.status !== "concluida").length],
     ["Planejadas", orders.filter(item => item.status === "planejada").length],
     ["Liberadas", orders.filter(item => item.status === "liberada").length],
-    ["Em produÃ§Ã£o", orders.filter(item => item.status === "em_producao").length],
-    ["ConcluÃ­das", orders.filter(item => item.status === "concluida").length],
+    ["Em produção", orders.filter(item => item.status === "em_producao").length],
+    ["Concluídas", orders.filter(item => item.status === "concluida").length],
     ["Atrasadas", active.filter(item => item.due_date < new Date().toISOString().slice(0,10)).length],
   ].map(([label,value]) => `<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
 }
@@ -276,7 +281,7 @@ function ensurePcpConsolidation() {
   const root = $("#pcp");
   const block = document.createElement("div");
   block.id = "pcp-consolidated";
-  block.innerHTML = `<div id="operational-flow" class="metrics compact"></div><article><div class="toolbar"><div><h2>Pedidos manuais sem orçamento</h2><small>Entrada direta pelo analista de custos, com rastreabilidade própria.</small></div><button id="new-direct-request">+ Pedido manual</button></div><div id="direct-request-table"></div></article><article><h2>Arquivo e liberaÃ§Ã£o de OPs</h2><div id="op-archive-table"></div></article><article><h2>Liberação para faturamento</h2><p class="muted">Somente orçamentos com todas as OPs concluídas podem ser selecionados.</p><div id="invoice-release-table"></div></article>`;
+  block.innerHTML = `<div id="operational-flow" class="metrics compact"></div><article><div class="toolbar"><div><h2>Pedidos manuais sem orçamento</h2><small>Entrada direta pelo analista de custos, com rastreabilidade própria.</small></div><button id="new-direct-request">+ Pedido manual</button></div><div id="direct-request-table"></div></article><article><h2>Arquivo e liberação de OPs</h2><div id="op-archive-table"></div></article><article><h2>Liberação para faturamento</h2><p class="muted">Somente orçamentos com todas as OPs concluídas podem ser selecionados.</p><div id="invoice-release-table"></div></article>`;
   root.appendChild(block);
   $("#new-direct-request").onclick = createDirectRequest;
 }
@@ -301,8 +306,9 @@ async function createDirectRequest() {
 $("#manual-order-form").onsubmit=async event=>{event.preventDefault();const form=Object.fromEntries(new FormData(event.target));try{const items=form.items_text.split(/\r?\n/).filter(Boolean).map((line,index)=>{const [code,description,quantity,unit,material,thickness,unitPrice]=line.split(";").map(value=>value.trim());if(!code||!description||!(Number(String(quantity).replace(",","."))>0))throw Error(`Item ${index+1} inválido. Use o formato indicado.`);return{code,description,quantity:Number(String(quantity).replace(",",".")),unit:unit||"un",material:material||"",thickness_mm:thickness?Number(String(thickness).replace(",",".")):null,unit_price:unitPrice?Number(String(unitPrice).replace(",",".")):0};});if(!items.length)throw Error("Informe ao menos um item.");const payload={origin:"pedido_manual_sem_orcamento",client:form.client,customer_erp_code:form.customer_erp_code,contact:form.contact,customer_order_number:form.customer_order_number,description:form.description,processes:form.processes.split(",").map(value=>value.trim()).filter(Boolean),material:form.material,due_date:form.due_date,priority:Number(form.priority),billing_unit:form.billing_unit,reason:form.reason,items};await req("/pcp/direct-requests",{method:"POST",body:JSON.stringify(payload)});$("#manual-order-dialog").close();await pcp();alert("Pedido manual registrado sem geração de orçamento.");}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
 
 async function integrations() {
-  const [orders, events] = await Promise.all([
-    req("/integrations/orders"), req("/integrations/erp/events")
+  const [orders, events, settings, readiness] = await Promise.all([
+    req("/integrations/orders"), req("/integrations/erp/events"),
+    req("/integrations/erp/settings"), req("/integrations/erp/readiness")
   ]);
   $("#imports").innerHTML = table(
     ["Empresa","Origem","Pedido","Cliente","Status"],
@@ -312,15 +318,22 @@ async function integrations() {
     ["Empresa","Entidade","Ação","Tent.","Status / erro"],
     events.map(item => `<tr><td>${esc(item.company_unit).toUpperCase()}</td><td>${esc(item.entity)}</td><td>${esc(item.action)}</td><td>${item.attempts}</td><td>${pill(item.status)}<br><small>${esc(item.last_error)}</small></td></tr>`)
   );
+  const form=$("#erp-settings-form");
+  if(!form.elements.danfer_company_erp_code){form.elements.enabled.closest("label").insertAdjacentHTML("beforebegin",`<label>Empresa Danfer no ERP<input name="danfer_company_erp_code"></label><label>Empresa DF no ERP<input name="df_company_erp_code"></label><label>Série da NFe<input name="invoice_series"></label><label>Modelo fiscal<input name="invoice_model" value="55"></label>`);}
+  Object.entries(settings).forEach(([key,value])=>{if(form.elements[key])form.elements[key].value=String(value);});
+  $("#erp-readiness").innerHTML=pill(readiness.ready?"pronto":"configuração pendente");
+  $("#erp-settings-status").textContent=readiness.pending.length?`Pendências: ${readiness.pending.join(", ")}`:"Contrato pronto para homologação.";
   $("#crm-opportunity-summary").innerHTML = [["Oportunidades",opportunities.length],["Valor",money(opportunities.reduce((sum,item)=>sum+item.value,0))],["Valor ponderado",money(opportunities.reduce((sum,item)=>sum+item.value*item.probability_percent/100,0))],["Alertas ativos",alerts.length]].map(([label,value])=>`<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
   $("#crm-alerts").innerHTML = alerts.length ? table(["Prioridade","Negociação","Cliente","Responsável","Alerta","Prazo"], alerts.map(item=>`<tr><td>${pill(item.severity)}</td><td><b>${esc(item.opportunity_number)}</b></td><td>${esc(item.client_name)}</td><td>${esc(item.owner||"—")}</td><td>${esc(item.message)}</td><td>${item.due_date||"—"}</td></tr>`)) : `<p class="muted">Nenhum alerta de CRM pendente.</p>`;
-  $("#crm-opportunities").innerHTML = table(["NegociaÃ§Ã£o","Cliente","Etapa","Valor","Probabilidade","ResponsÃ¡vel","PrÃ³ximo contato","AÃ§Ãµes"], opportunities.map(item=>`<tr><td><b>${esc(item.number)}</b></td><td>${esc(item.client_name)}</td><td>${pill(item.stage)}</td><td>${money(item.value)}</td><td>${item.probability_percent}%</td><td>${esc(item.owner||"â€”")}</td><td>${item.next_contact||"â€”"}</td><td><button class="action" onclick="advanceOpportunity('${item.id}')">AvanÃ§ar</button> <button class="action" onclick="addCrmActivity('${item.id}')">Atividade</button></td></tr>`));
+  $("#crm-opportunities").innerHTML = table(["Negociação","Cliente","Etapa","Valor","Probabilidade","Responsável","Próximo contato","Ações"], opportunities.map(item=>`<tr><td><b>${esc(item.number)}</b></td><td>${esc(item.client_name)}</td><td>${pill(item.stage)}</td><td>${money(item.value)}</td><td>${item.probability_percent}%</td><td>${esc(item.owner||"—")}</td><td>${item.next_contact||"—"}</td><td><button class="action" onclick="advanceOpportunity('${item.id}')">Avançar</button> <button class="action" onclick="addCrmActivity('${item.id}')">Atividade</button></td></tr>`));
 }
 
-function ensureCrmOpportunities(){if($("#crm-opportunity-card"))return;const article=document.createElement("article");article.id="crm-opportunity-card";article.innerHTML=`<div class="toolbar"><div><h2>Centro de negociaÃ§Ãµes</h2><small>Funil, atividades e prÃ³ximos contatos.</small></div><button id="new-opportunity">+ Nova oportunidade</button></div><div id="crm-opportunity-summary" class="metrics compact"></div><h3>Alertas automáticos</h3><div id="crm-alerts"></div><h3>Oportunidades</h3><div id="crm-opportunities"></div>`;$("#crm").appendChild(article);$("#new-opportunity").onclick=createOpportunity;}
-async function createOpportunity(){const client_name=prompt("Cliente:");if(!client_name)return;const value=Number(prompt("Valor estimado:","0")||0),owner=prompt("ResponsÃ¡vel:",currentUser?.name||"")||"",next_contact=prompt("PrÃ³ximo contato (AAAA-MM-DD):",new Date(Date.now()+2*86400000).toISOString().slice(0,10));await req("/crm/opportunities",{method:"POST",body:JSON.stringify({client_name,value,owner,next_contact})});await crm();}
+$("#erp-settings-form").onsubmit=async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(event.target));values.enabled=values.enabled==="true";values.timeout_seconds=30;try{await req("/integrations/erp/settings",{method:"PUT",body:JSON.stringify(values)});await integrations();$("#erp-settings-status").textContent="Configuração ERP salva.";}catch(error){$("#erp-settings-status").textContent=error.message;}};
+
+function ensureCrmOpportunities(){if($("#crm-opportunity-card"))return;const article=document.createElement("article");article.id="crm-opportunity-card";article.innerHTML=`<div class="toolbar"><div><h2>Centro de negociações</h2><small>Funil, atividades e próximos contatos.</small></div><button id="new-opportunity">+ Nova oportunidade</button></div><div id="crm-opportunity-summary" class="metrics compact"></div><h3>Alertas automáticos</h3><div id="crm-alerts"></div><h3>Oportunidades</h3><div id="crm-opportunities"></div>`;$("#crm").appendChild(article);$("#new-opportunity").onclick=createOpportunity;}
+async function createOpportunity(){const client_name=prompt("Cliente:");if(!client_name)return;const value=Number(prompt("Valor estimado:","0")||0),owner=prompt("Responsável:",currentUser?.name||"")||"",next_contact=prompt("Próximo contato (AAAA-MM-DD):",new Date(Date.now()+2*86400000).toISOString().slice(0,10));await req("/crm/opportunities",{method:"POST",body:JSON.stringify({client_name,value,owner,next_contact})});await crm();}
 window.advanceOpportunity=async id=>{const stages=["em_elaboracao","enviada","em_negociacao","aprovada"],items=await req("/crm/opportunities"),item=items.find(value=>value.id===id);if(!item)return;const next=stages[Math.min(stages.length-1,Math.max(0,stages.indexOf(item.stage)+1))];await req(`/crm/opportunities/${id}`,{method:"PATCH",body:JSON.stringify({stage:next,probability_percent:[10,35,60,100][stages.indexOf(next)]})});await crm();};
-window.addCrmActivity=async id=>{const description=prompt("Resumo da atividade:");if(!description)return;const next_contact=prompt("PrÃ³ximo contato (AAAA-MM-DD):",new Date(Date.now()+2*86400000).toISOString().slice(0,10));await req(`/crm/opportunities/${id}/activities`,{method:"POST",body:JSON.stringify({type:"contato",description,performed_by:currentUser?.name||"",next_contact})});await crm();};
+window.addCrmActivity=async id=>{const description=prompt("Resumo da atividade:");if(!description)return;const next_contact=prompt("Próximo contato (AAAA-MM-DD):",new Date(Date.now()+2*86400000).toISOString().slice(0,10));await req(`/crm/opportunities/${id}/activities`,{method:"POST",body:JSON.stringify({type:"contato",description,performed_by:currentUser?.name||"",next_contact})});await crm();};
 
 async function coordination() {
   const [profiles, requests, messages] = await Promise.all([
@@ -332,10 +345,11 @@ async function coordination() {
 }
 
 async function quality() {
-  const data = await req("/quality");
+  const [data,deviationsData] = await Promise.all([req("/quality"),req("/analytics/deviations")]);
+  const byOrder=new Map(deviationsData.map(item=>[item.order_number,item]));
   $("#quality-table").innerHTML = table(
-    ["Tipo","Descrição","OP","Responsável","Custo","Situação","Ação"],
-    data.map(item => `<tr><td>${esc(item.type)}</td><td>${esc(item.description)}</td><td>${esc(item.production_order || "—")}</td><td>${esc(item.responsible || "—")}</td><td>${money(item.cost)}</td><td>${pill(item.resolved ? "concluida" : "aberta")}</td><td>${item.resolved ? "" : `<button class="action" onclick="resolveQuality('${item.id}')">Resolver</button>`}</td></tr>`)
+    ["Tipo","Descrição","OP / orçamento","Responsável","Custo","Margem após custo","Situação","Ação"],
+    data.map(item => {const impact=byOrder.get(item.production_order);return `<tr><td>${esc(item.type)}</td><td>${esc(item.description)}</td><td><b>${esc(item.production_order || "—")}</b><br><small>${esc(impact?.quote_number||"")}</small></td><td>${esc(item.responsible || "—")}</td><td>${money(item.cost)}</td><td>${impact?.actual_margin_percent==null?"—":impact.actual_margin_percent+"%"}<br><small>${impact?.margin_impact_percent==null?"":`Impacto ${impact.margin_impact_percent}%`}</small></td><td>${pill(item.resolved ? "concluida" : "aberta")}</td><td>${item.resolved ? "" : `<button class="action" onclick="resolveQuality('${item.id}')">Resolver</button>`}</td></tr>`;})
   );
 }
 window.resolveQuality = async id => {
@@ -347,10 +361,10 @@ function ensureAnalyticsSections() {
   const main = document.querySelector("main");
   const definitions = {
     "quality-dashboard": `<div class="hero"><p>QUALIDADE</p><h2>Dashboard da qualidade</h2></div><div id="quality-kpis" class="metrics"></div><article><div id="quality-summary-table"></div></article>`,
-    deviations: `<div class="hero"><p>CUSTOS</p><h2>AnÃ¡lise de desvios</h2></div><article><div id="deviation-analysis-table"></div></article>`,
-    "management-dashboard": `<div class="hero"><p>GESTÃƒO</p><h2>Dashboards gerenciais</h2></div><div id="management-kpis" class="metrics"></div>`,
-    "monthly-analysis": `<div class="hero"><p>GESTÃƒO DE CUSTOS</p><h2>AnÃ¡lise mensal</h2></div><div class="toolbar"><label>InÃ­cio<input id="monthly-start" type="date"></label><label>Fim<input id="monthly-end" type="date"></label><button id="monthly-refresh">Aplicar filtros</button><button id="monthly-export">Exportar CSV</button></div><div id="monthly-kpis" class="metrics"></div><article><div id="monthly-analysis-table"></div></article>`,
-    audit: `<div class="hero"><p>RASTREABILIDADE</p><h2>Auditoria</h2></div><div class="toolbar"><input id="audit-module-filter" placeholder="Filtrar mÃ³dulo"><button id="audit-refresh">Atualizar</button><button id="audit-export">Exportar CSV</button></div><article><div id="audit-analysis-table"></div></article>`,
+    deviations: `<div class="hero"><p>CUSTOS</p><h2>Análise de desvios</h2><span>Compara o custo previsto na OP com apontamentos reais de material, processo, terceiros e qualidade. Valores positivos indicam estouro; a margem mostra o efeito sobre o orçamento.</span></div><article><div id="deviation-analysis-table"></div></article>`,
+    "management-dashboard": `<div class="hero"><p>GESTÃO</p><h2>Dashboards gerenciais</h2><span>Clique nos indicadores para abrir os dados de origem.</span></div><div id="management-kpis" class="metrics"></div>`,
+    "monthly-analysis": `<div class="hero"><p>GESTÃO DE CUSTOS</p><h2>Análise mensal</h2></div><div class="toolbar"><label>Início<input id="monthly-start" type="date"></label><label>Fim<input id="monthly-end" type="date"></label><button id="monthly-refresh">Aplicar filtros</button><button id="monthly-export">Exportar CSV</button></div><div id="monthly-kpis" class="metrics"></div><article><div id="monthly-analysis-table"></div></article>`,
+    audit: `<div class="hero"><p>RASTREABILIDADE</p><h2>Auditoria</h2></div><div class="toolbar"><input id="audit-module-filter" placeholder="Filtrar módulo"><button id="audit-refresh">Atualizar</button><button id="audit-export">Exportar CSV</button></div><article><div id="audit-analysis-table"></div></article>`,
   };
   Object.entries(definitions).forEach(([id, html]) => {
     if ($("#" + id)) return;
@@ -366,9 +380,9 @@ function ensureAnalyticsSections() {
 function ensureGlobalTools(){
   if($("#global-search"))return;
   const header=document.querySelector("main > header"),tools=document.createElement("div");tools.className="global-tools";
-  tools.innerHTML=`<div class="global-search-wrap"><input id="global-search" placeholder="Pesquisar cliente, orÃ§amento, OP ou SP"><div id="global-search-results"></div></div><button id="print-current-view" type="button">Imprimir / PDF</button><button id="theme-toggle" type="button" aria-label="Alternar esquema de cores"></button><button id="enable-push" type="button">Ativar avisos</button><button id="notification-center" type="button">NotificaÃ§Ãµes</button>`;
+  tools.innerHTML=`<div class="global-search-wrap"><input id="global-search" placeholder="Pesquisar cliente, orçamento, OP ou SP"><div id="global-search-results"></div></div><button id="print-current-view" type="button">Imprimir / PDF</button><button id="theme-toggle" type="button" aria-label="Alternar esquema de cores"></button><button id="enable-push" type="button">Ativar avisos</button><button id="notification-center" type="button">Notificações</button>`;
   header.appendChild(tools);
-  let timer;$("#global-search").oninput=event=>{clearTimeout(timer);const q=event.target.value.trim();if(q.length<2){$("#global-search-results").innerHTML="";return}timer=setTimeout(async()=>{const data=await req(`/search?q=${encodeURIComponent(q)}`);$("#global-search-results").innerHTML=data.map(item=>`<button type="button" onclick="openGlobalSearchResult('${esc(item.type)}','${esc(item.title)}')"><b>${esc(item.type)} Â· ${esc(item.title)}</b><small>${esc(item.subtitle)}</small></button>`).join("")||"<small>Nenhum resultado.</small>";},250)};
+  let timer;$("#global-search").oninput=event=>{clearTimeout(timer);const q=event.target.value.trim();if(q.length<2){$("#global-search-results").innerHTML="";return}timer=setTimeout(async()=>{const data=await req(`/search?q=${encodeURIComponent(q)}`);$("#global-search-results").innerHTML=data.map(item=>`<button type="button" onclick="openGlobalSearchResult('${esc(item.type)}','${esc(item.title)}')"><b>${esc(item.type)} · ${esc(item.title)}</b><small>${esc(item.subtitle)}</small></button>`).join("")||"<small>Nenhum resultado.</small>";},250)};
   $("#notification-center").onclick=showNotifications;
   $("#print-current-view").onclick=printCurrentView;
   $("#theme-toggle").onclick=cycleTheme;
@@ -384,7 +398,7 @@ function applyTheme(preference){const theme=resolveTheme(preference);document.do
 function renderThemeButton(){const button=$("#theme-toggle");if(!button)return;const preference=document.documentElement.dataset.themePreference||localStorage.getItem("danfer-theme")||"auto";const labels={auto:"◐ Automático",light:"☀ Claro",dark:"☾ Escuro"};button.textContent=labels[preference];button.title=`Tema atual: ${labels[preference]}. Clique para alternar.`;}
 function cycleTheme(){const current=document.documentElement.dataset.themePreference||"auto",order=["auto","light","dark"],next=order[(order.indexOf(current)+1)%order.length];applyTheme(next);}
 matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",()=>{if((document.documentElement.dataset.themePreference||"auto")==="auto")applyTheme("auto");});
-async function showNotifications(){if(!currentUser)return;const data=await req(`/notifications?username=${encodeURIComponent(currentUser.username)}&role=${encodeURIComponent(currentUser.role)}`);alert(data.length?data.slice(0,12).map(item=>`${item.read?"":"â€¢ "}${item.title}\n${item.message}`).join("\n\n"):"Nenhuma notificaÃ§Ã£o.");await Promise.all(data.filter(item=>!item.read).map(item=>req(`/notifications/${item.id}/read`,{method:"POST"})));}
+async function showNotifications(){if(!currentUser)return;const data=await req(`/notifications?username=${encodeURIComponent(currentUser.username)}&role=${encodeURIComponent(currentUser.role)}`);alert(data.length?data.slice(0,12).map(item=>`${item.read?"":"• "}${item.title}\n${item.message}`).join("\n\n"):"Nenhuma notificação.");await Promise.all(data.filter(item=>!item.read).map(item=>req(`/notifications/${item.id}/read`,{method:"POST"})));}
 function vapidKeyBytes(value){const padding="=".repeat((4-value.length%4)%4),base64=(value+padding).replace(/-/g,"+").replace(/_/g,"/");return Uint8Array.from(atob(base64),character=>character.charCodeAt(0));}
 async function enablePushNotifications(){
   if(!currentUser||!("serviceWorker" in navigator)||!("PushManager" in window)){alert("Este navegador não oferece suporte a avisos push.");return;}
@@ -403,42 +417,43 @@ async function enablePushNotifications(){
 
 function ensureAdminSystemTools(){
   if(currentUser?.role!=="administrador"||$("#system-admin-card"))return;
-  const card=document.createElement("article");card.id="system-admin-card";card.innerHTML=`<div class="toolbar"><div><h2>Backup e restauraÃ§Ã£o</h2><small>CÃ³pia completa dos dados persistidos no servidor.</small></div><div><a class="action" href="${api}/system/backup">Baixar backup</a> <label class="action">Restaurar<input id="restore-system-file" type="file" accept=".zip" hidden></label></div></div><p id="system-admin-status"></p>`;$("#maintenance").appendChild(card);$("#restore-system-file").onchange=async event=>{const file=event.target.files[0];if(!file)return;if(!confirm("Restaurar este backup? Uma cÃ³pia de seguranÃ§a serÃ¡ criada antes da alteraÃ§Ã£o."))return;const response=await fetch(api+"/system/restore",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/zip"},body:file});const result=await response.json();$("#system-admin-status").textContent=response.ok?`RestauraÃ§Ã£o concluÃ­da. Reinicie o sistema. Backup anterior: ${result.pre_restore_backup}`:(result.detail||"Falha na restauraÃ§Ã£o.");};
+  const card=document.createElement("article");card.id="system-admin-card";card.innerHTML=`<div class="toolbar"><div><h2>Backup e restauração</h2><small>Cópia completa dos dados persistidos no servidor.</small></div><div><a class="action" href="${api}/system/backup">Baixar backup</a> <label class="action">Restaurar<input id="restore-system-file" type="file" accept=".zip" hidden></label></div></div><p id="system-admin-status"></p>`;$("#maintenance").appendChild(card);$("#restore-system-file").onchange=async event=>{const file=event.target.files[0];if(!file)return;if(!confirm("Restaurar este backup? Uma cópia de segurança será criada antes da alteração."))return;const response=await fetch(api+"/system/restore",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/zip"},body:file});const result=await response.json();$("#system-admin-status").textContent=response.ok?`Restauração concluída. Reinicie o sistema. Backup anterior: ${result.pre_restore_backup}`:(result.detail||"Falha na restauração.");};
 }
 
 async function qualityDashboard() {
   const data = await req("/analytics/quality");
-  $("#quality-kpis").innerHTML = [["OcorrÃªncias",data.total],["Abertas",data.open],["Resolvidas",data.resolved],["Custo total",money(data.total_cost)]].map(([label,value]) => `<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
+  $("#quality-kpis").innerHTML = [["Ocorrências",data.total],["Abertas",data.open],["Resolvidas",data.resolved],["Custo total",money(data.total_cost)]].map(([label,value]) => `<button class="metric dashboard-link" onclick="openDashboardSource('quality')"><b>${value}</b><span>${label}</span><small>Abrir ocorrências</small></button>`).join("");
   $("#quality-summary-table").innerHTML = table(["Tipo","Quantidade"], data.by_type.map(item => `<tr><td>${esc(item.type)}</td><td><b>${item.total}</b></td></tr>`));
 }
 
 async function deviations() {
   const data = await req("/analytics/deviations");
-  $("#deviation-analysis-table").innerHTML = table(["OP","Previsto","Realizado","Desvio","%","Prazo","Status","Motivo"], data.map(item => `<tr><td><b>${esc(item.order_number)}</b></td><td>${money(item.estimated_total_cost)}</td><td>${money(item.actual_total_cost)}</td><td>${money(item.variance_value)}</td><td>${item.variance_percent ?? "â€”"}%</td><td>${item.due_date}</td><td>${pill(item.status)}</td><td>${esc(item.reason)}</td></tr>`));
+  $("#deviation-analysis-table").innerHTML = table(["OP / orçamento","Previsto","Realizado","Desvio","Margem prevista","Margem efetiva","Impacto","Status","Motivo"], data.map(item => `<tr><td><b>${esc(item.order_number)}</b><br><small>${esc(item.quote_number||"")}</small></td><td>${money(item.estimated_total_cost)}</td><td>${money(item.actual_total_cost)}</td><td>${money(item.variance_value)}<br><small>${item.variance_percent ?? "—"}%</small></td><td>${item.estimated_margin_percent==null?"—":item.estimated_margin_percent+"%"}</td><td>${item.actual_margin_percent==null?"—":item.actual_margin_percent+"%"}</td><td>${item.margin_impact_percent==null?"—":item.margin_impact_percent+"%"}</td><td>${pill(item.status)}</td><td>${esc(item.reason)}</td></tr>`));
 }
 
 async function managementDashboard() {
   const data = await req("/analytics/management");
-  $("#management-kpis").innerHTML = [["OrÃ§amentos",data.quotes],["Aprovados",data.approved_quotes],["ConversÃ£o",data.conversion_percent+"%"],["Receita projetada",money(data.projected_revenue)],["OPs ativas",data.active_orders],["OPs atrasadas",data.late_orders],["Custo qualidade",money(data.quality_cost)]].map(([label,value]) => `<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
+  $("#management-kpis").innerHTML = [["Orçamentos",data.quotes,"quotes"],["Aprovados",data.approved_quotes,"quotes"],["Conversão",data.conversion_percent+"%","quotes"],["Receita projetada",money(data.projected_revenue),"quotes"],["OPs ativas",data.active_orders,"pcp"],["OPs atrasadas",data.late_orders,"pcp"],["Custo qualidade",money(data.quality_cost),"quality"]].map(([label,value,view]) => `<button class="metric dashboard-link" onclick="openDashboardSource('${view}')"><b>${value}</b><span>${label}</span><small>Apurar dados</small></button>`).join("");
 }
+window.openDashboardSource=async view=>{const button=document.querySelector(`nav button[data-view="${view}"]`);if(button&&!button.hidden)await button.onclick();};
 
 let lastMonthlyRows = [], lastAuditRows = [];
 async function monthlyAnalysis() {
   const data = await req(`/analytics/monthly?start=${$("#monthly-start").value}&end=${$("#monthly-end").value}`); lastMonthlyRows = data.rows;
   $("#monthly-kpis").innerHTML = [["Ordens",data.orders],["Previsto",money(data.estimated)],["Realizado",money(data.actual)],["Desvio",money(data.variance)]].map(([label,value]) => `<div class="metric"><b>${value}</b><span>${label}</span></div>`).join("");
-  $("#monthly-analysis-table").innerHTML = table(["OP","Data","Status","Previsto","Realizado","Desvio","%"], data.rows.map(item => `<tr><td><b>${esc(item.order)}</b></td><td>${item.date}</td><td>${pill(item.status)}</td><td>${money(item.estimated)}</td><td>${money(item.actual)}</td><td>${money(item.variance)}</td><td>${item.variance_percent ?? "â€”"}</td></tr>`));
+  $("#monthly-analysis-table").innerHTML = table(["OP","Data","Status","Previsto","Realizado","Desvio","%"], data.rows.map(item => `<tr><td><b>${esc(item.order)}</b></td><td>${item.date}</td><td>${pill(item.status)}</td><td>${money(item.estimated)}</td><td>${money(item.actual)}</td><td>${money(item.variance)}</td><td>${item.variance_percent ?? "—"}</td></tr>`));
 }
-async function auditAnalysis() { const module = $("#audit-module-filter").value.trim(); lastAuditRows = await req("/audit" + (module ? `?module=${encodeURIComponent(module)}` : "")); $("#audit-analysis-table").innerHTML = table(["Data","MÃ³dulo","AÃ§Ã£o","Entidade","Detalhes"], lastAuditRows.map(item => `<tr><td>${new Date(item.created_at).toLocaleString("pt-BR")}</td><td>${esc(item.module)}</td><td>${esc(item.action)}</td><td>${esc(item.entity_id)}</td><td>${esc(item.details)}</td></tr>`)); }
+async function auditAnalysis() { const module = $("#audit-module-filter").value.trim(); lastAuditRows = await req("/audit" + (module ? `?module=${encodeURIComponent(module)}` : "")); $("#audit-analysis-table").innerHTML = table(["Data","Módulo","Ação","Entidade","Detalhes"], lastAuditRows.map(item => `<tr><td>${new Date(item.created_at).toLocaleString("pt-BR")}</td><td>${esc(item.module)}</td><td>${esc(item.action)}</td><td>${esc(item.entity_id)}</td><td>${esc(item.details)}</td></tr>`)); }
 function downloadCsv(name, headers, rows) { const csv = [headers,...rows].map(row => row.map(value => `"${String(value ?? "").replaceAll('"','""')}"`).join(";")).join("\n"); const link=document.createElement("a"); link.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv"})); link.download=name; link.click(); setTimeout(()=>URL.revokeObjectURL(link.href),1000); }
 function exportMonthlyCsv(){downloadCsv("analise_mensal_danfer.csv",["OP","Data","Status","Previsto","Realizado","Desvio","Percentual"],lastMonthlyRows.map(item=>[item.order,item.date,item.status,item.estimated,item.actual,item.variance,item.variance_percent]));}
-function exportAuditCsv(){downloadCsv("auditoria_danfer.csv",["Data","MÃ³dulo","AÃ§Ã£o","Entidade","Detalhes"],lastAuditRows.map(item=>[item.created_at,item.module,item.action,item.entity_id,item.details]));}
+function exportAuditCsv(){downloadCsv("auditoria_danfer.csv",["Data","Módulo","Ação","Entidade","Detalhes"],lastAuditRows.map(item=>[item.created_at,item.module,item.action,item.entity_id,item.details]));}
 
 async function renderUserAccess() {
   let card = $("#user-access-card");
   if (!card) {
     card = document.createElement("article");
     card.id = "user-access-card";
-    card.innerHTML = `<div class="toolbar"><div><h2>UsuÃ¡rios e permissÃµes</h2><small>Perfil, situaÃ§Ã£o e mÃ³dulos liberados por usuÃ¡rio.</small></div></div><div id="user-access-table"></div>`;
+    card.innerHTML = `<div class="toolbar"><div><h2>Usuários e permissões</h2><small>Perfil, situação e módulos liberados por usuário.</small></div></div><div id="user-access-table"></div>`;
     $("#maintenance").insertBefore(card, $("#maintenance-table").closest("article"));
   }
   card.hidden = currentUser?.role !== "administrador";
@@ -508,6 +523,7 @@ async function maintenance() {
   }
   await renderUserAccess();
   ensureAdminSystemTools();
+  renderMaintenanceSubmenus();
   $("#maintenance-table").innerHTML = table(
     ["Ordem","Equipamento","Tipo","Data","Responsável","Status"],
     data.map(item => `<tr><td><b>${esc(item.number)}</b></td><td>${esc(item.equipment)}</td><td>${esc(item.type)}</td><td>${item.scheduled_date || "—"}</td><td>${esc(item.responsible || "—")}</td><td>${pill(item.status)}</td></tr>`)
@@ -528,7 +544,8 @@ document.querySelectorAll("nav button").forEach(button => {
 });
 
 function dialogControls(openSelector, dialogSelector, closeSelector) {
-  $(openSelector).onclick = () => $(dialogSelector).showModal();
+  const opener = $(openSelector);
+  if (opener) opener.onclick = () => $(dialogSelector).showModal();
   document.querySelectorAll(closeSelector).forEach(button => {
     button.onclick = () => $(dialogSelector).close();
   });
@@ -541,10 +558,17 @@ dialogControls("#new-maintenance", "#maintenance-dialog", ".close-maintenance");
 dialogControls("#new-material", "#material-dialog", ".close-material");
 dialogControls("#import-price-table", "#price-table-dialog", ".close-price-table");
 dialogControls("#new-dxf", "#dxf-dialog", ".close-dxf");
+if ($("#new-dxf")) $("#new-dxf").addEventListener("click",async()=>{dxfImportTarget="engineering";await populateDxfMaterials();});
+$("#import-quote-dxf").onclick=async()=>{dxfImportTarget="quote";await populateDxfMaterials();$("#quote-dialog").close();$("#dxf-dialog").showModal();};
+document.querySelectorAll(".close-dxf").forEach(button=>button.addEventListener("click",()=>{if(dxfImportTarget==="quote"&&!$("#quote-dialog").open)$("#quote-dialog").showModal();}));
+async function populateDxfMaterials(){if(!quoteMaterialCatalog.length)quoteMaterialCatalog=await req("/catalogs/quote-materials");$("#dxf-material").innerHTML='<option value="">Selecionar material…</option>'+quoteMaterialCatalog.map(item=>`<option value="${item.id}">${esc(item.description)} · ${item.thickness_mm} mm</option>`).join("");}
 let pdfReturnToQuote=false;
 $("#new-pdf-drawing").onclick=()=>{pdfReturnToQuote=$("#quote-dialog").open;if(pdfReturnToQuote)$("#quote-dialog").close();$("#pdf-drawing-dialog").showModal();};
 document.querySelectorAll(".close-pdf-drawing").forEach(button=>button.onclick=()=>{$("#pdf-drawing-dialog").close();if(pdfReturnToQuote)$("#quote-dialog").showModal();});
 dialogControls("#new-nesting", "#nesting-dialog", ".close-nesting");
+document.querySelectorAll(".close-bom").forEach(button=>button.onclick=()=>$("#bom-dialog").close());
+$("#new-bom").onclick=async()=>{const data=await req("/technical-library");$("#bom-product").innerHTML=data.items.map(item=>`<option value="${item.id}">${esc(item.danfer_code)} — ${esc(item.title)}</option>`).join("");$("#bom-dialog").showModal();};
+$("#new-quality").addEventListener("click",async()=>{const orders=await req("/pcp/orders");$("#quality-production-order").innerHTML=orders.map(order=>`<option value="${esc(order.number)}">${esc(order.number)} — ${esc(order.client_name||"Sem cliente")}</option>`).join("");});
 dialogControls("#new-work-log", "#work-log-dialog", ".close-work-log");
 document.querySelectorAll(".close-manual-order").forEach(button=>button.onclick=()=>$("#manual-order-dialog").close());
 document.querySelectorAll(".close-invoiced-history").forEach(button=>button.onclick=()=>$("#invoiced-history-dialog").close());
@@ -575,7 +599,7 @@ $("#part-form").onsubmit = async event => {
 $("#material-form").onsubmit = async event => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
-  ["thickness_mm", "price_per_kg", "density_kg_m3"].forEach(key => data[key] = Number(data[key]));
+  ["thickness_mm", "price_per_kg", "density_kg_m3", "unit_conversion_factor"].forEach(key => data[key] = Number(data[key]));
   try {
     await req("/catalogs/materials", {method:"POST", body:JSON.stringify(data)});
     $("#material-dialog").close(); event.target.reset(); await engineering();
@@ -590,25 +614,30 @@ $("#dxf-form").onsubmit = async event => {
   event.preventDefault();
   const values = Object.fromEntries(new FormData(event.target));
   try {
-    const files = [...event.target.elements.dxf_file.files];
+    const files = [...event.target.elements.dxf_file.files,...event.target.elements.dxf_folder.files].filter((file,index,all)=>file.name.toLocaleLowerCase().endsWith(".dxf")&&all.findIndex(other=>other.name===file.name&&other.size===file.size)===index);
+    if(!files.length)throw Error("Selecione pelo menos um arquivo DXF ou uma pasta com desenhos.");
     const uploads = await Promise.all(files.map(file => new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve({filename:file.name, content_base64:String(reader.result).split(",")[1]});
       reader.onerror = reject;
       reader.readAsDataURL(file);
     })));
-    const thickness = Number(values.thickness_mm);
+    const selectedMaterial=quoteMaterialCatalog.find(item=>item.id===values.material_id);
+    if(!selectedMaterial)throw Error("Selecione o material e a espessura configurados nas Manutenções.");
+    const thickness = Number(selectedMaterial.thickness_mm);
     lastDxfDrafts = await req("/engineering/dxf/quote-drafts", {method:"POST", body:JSON.stringify({
-      uploads, material:values.material, thickness_mm:thickness,
-      material_price_kg:Number(values.material_price_kg || 0)
+      uploads, material_id:values.material_id, material:selectedMaterial.description, thickness_mm:thickness
     })});
     await Promise.all(uploads.map((upload, index) => req("/engineering/dxf/register", {method:"POST", body:JSON.stringify({
       ...upload, danfer_code:`${values.danfer_code}-${String(index + 1).padStart(3, "0")}`,
-      customer_code:values.customer_code, customer:values.customer, material:values.material,
+      customer_code:values.customer_code, customer:values.customer, material:selectedMaterial.description,
       thickness_mm:thickness, revision:values.revision
     })})));
-    $("#dxf-dialog").close(); event.target.reset(); await engineering();
-    renderDxfDrafts();
+    $("#dxf-dialog").close(); event.target.reset();
+    if(dxfImportTarget==="quote"){
+      pendingQuoteItems.push(...lastDxfDrafts.map(item=>({...item,margin_percent:30,material_id:values.material_id})));
+      renderPendingQuoteItems();$("#quote-dialog").showModal();
+    }else{await engineering();renderDxfDrafts();}
   } catch (error) { event.target.querySelector(".dialog-error").textContent = error.message; }
 };
 
@@ -624,6 +653,16 @@ function renderDxfDrafts() {
     renderPendingQuoteItems();
   };
 }
+
+function renderMaintenanceSubmenus(){const root=$("#maintenance"),orders=$("#maintenance-table")?.closest("article");if(orders)orders.id="maintenance-orders-card";let nav=$("#maintenance-submenus");if(!nav){nav=document.createElement("div");nav.id="maintenance-submenus";nav.className="maintenance-submenus";root.querySelector(":scope > .toolbar").insertAdjacentElement("afterend",nav);}const groups=[
+  ["commercial","Comercial e custos",["cost-settings-card","price-review-center"]],
+  ["production","Produção e roteiros",["routing-settings-card","operation-cost-settings-card","recovered-maintenance-card"]],
+  ["materials","Materiais e nesting",["material-cost-settings-card"]],
+  ["crm","CRM e alertas",["crm-alert-settings-card"]],
+  ["users","Usuários e permissões",["user-access-card"]],
+  ["system","Sistema e backup",["system-admin-card"]],
+  ["orders","Ordens de manutenção",["maintenance-orders-card"]],
+];const active=nav.dataset.active||"commercial";nav.innerHTML=groups.map(([key,label])=>`<button type="button" data-maint-group="${key}" class="${key===active?"active":""}">${label}</button>`).join("");const show=key=>{nav.dataset.active=key;nav.querySelectorAll("button").forEach(button=>button.classList.toggle("active",button.dataset.maintGroup===key));groups.forEach(([group,,ids])=>ids.forEach(id=>{const card=$("#"+id);if(card)card.hidden=group!==key;}));};nav.querySelectorAll("button").forEach(button=>button.onclick=()=>show(button.dataset.maintGroup));show(active);}
 
 async function renderOperationCostSettings(){let card=$("#operation-cost-settings-card");if(!card){card=document.createElement("article");card.id="operation-cost-settings-card";card.innerHTML=`<div class="toolbar"><div><h2>Centros de trabalho e valores por processo</h2><small>Valores administrativos aplicados automaticamente aos novos cálculos.</small></div></div><div id="operation-cost-settings"></div>`;$("#maintenance").insertBefore(card,$("#routing-settings-card"));}const operations=await req("/catalogs/operations");$("#operation-cost-settings").innerHTML=table(["ERP","Processo","Método","Valor","Unidade","Ação"],operations.map(item=>`<tr data-operation-code="${item.erp_code}"><td>${item.erp_code}</td><td><input data-operation-name value="${esc(item.name)}"></td><td><select data-operation-mode><option value="tempo" ${item.pricing_mode==="tempo"?"selected":""}>Tempo</option><option value="peso" ${item.pricing_mode==="peso"?"selected":""}>Peso</option><option value="fixo" ${item.pricing_mode==="fixo"?"selected":""}>Fixo</option></select></td><td><input data-operation-rate type="number" min="0" step=".01" value="${item.pricing_mode==="peso"?item.weight_rate:item.pricing_mode==="fixo"?item.fixed_cost:item.hourly_rate}"></td><td data-operation-unit>${item.pricing_mode==="peso"?"R$/kg":item.pricing_mode==="fixo"?"R$/operação":"R$/h"}</td><td><button type="button" data-save-operation>Salvar</button></td></tr>`));document.querySelectorAll("[data-operation-mode]").forEach(select=>select.onchange=()=>{select.closest("tr").querySelector("[data-operation-unit]").textContent=select.value==="peso"?"R$/kg":select.value==="fixo"?"R$/operação":"R$/h";});document.querySelectorAll("[data-save-operation]").forEach(button=>button.onclick=async()=>{const row=button.closest("tr"),mode=row.querySelector("[data-operation-mode]").value,rate=Number(row.querySelector("[data-operation-rate]").value),payload={name:row.querySelector("[data-operation-name]").value,pricing_mode:mode,hourly_rate:mode==="tempo"?rate:0,weight_rate:mode==="peso"?rate:0,fixed_cost:mode==="fixo"?rate:0};await req(`/catalogs/operations/${row.dataset.operationCode}`,{method:"PATCH",body:JSON.stringify(payload)});button.textContent="Salvo";setTimeout(()=>button.textContent="Salvar",1200);});}
 
@@ -672,6 +711,7 @@ $("#nesting-form").onsubmit = async event => {
 $("#client-form").onsubmit = async event => {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.target));
+  data.credit_limit=Number(data.credit_limit||0);
   try {
     await req("/commercial/clients", {method:"POST", body:JSON.stringify(data)});
     $("#client-dialog").close(); event.target.reset(); await crm();
@@ -684,30 +724,40 @@ $("#new-quote").addEventListener("click", async () => {
   pendingQuoteItems = [];
   editingQuoteItemIndex = null;
   renderPendingQuoteItems();
-  const [clients, materials, templates, bendTimes] = await Promise.all([
+  const [clients, materials, templates, bendTimes, paymentTerms] = await Promise.all([
     req("/commercial/clients"), req("/catalogs/quote-materials"),
-    req("/catalogs/quote-routing-templates"), req("/commercial/quote-bend-times")
+    req("/catalogs/quote-routing-templates"), req("/commercial/quote-bend-times"),
+    req("/maintenance-config/paymentTerms")
   ]);
   quoteMaterialCatalog = materials;
   routingTemplates = templates;
   bendTimeSettings = bendTimes;
-  $("#quote-material-options").innerHTML = materials.map(item => `<option value="${esc(item.description)}">${esc(item.erp_code)} · ${item.thickness_mm} mm</option>`).join("");
+  $("#quote-material-options").innerHTML = '<option value="">Selecionar material…</option>' + materials.map(item => `<option value="${item.id}">${esc(item.description)} · ${item.thickness_mm} mm</option>`).join("");
+  const activePaymentTerms=paymentTerms.filter(item=>String(item.ativo||"Sim").toLocaleLowerCase("pt-BR")!=="não");
+  $("#quote-payment-terms").innerHTML=activePaymentTerms.map(item=>`<option value="${esc(item.descricao)}">${esc(item.descricao)}</option>`).join("");
+  const defaultPayment=activePaymentTerms.find(item=>String(item.codigo).toLocaleUpperCase("pt-BR")==="28DDL")||activePaymentTerms[0];
+  if(defaultPayment) $("#quote-payment-terms").value=defaultPayment.descricao;
   $("#quote-client").innerHTML = clients.map(client =>
     `<option value="${client.id}">${client.erp_code ? esc(client.erp_code) + " — " : ""}${esc(client.name)}</option>`
   ).join("");
   $("#quote-routing-template").innerHTML = '<option value="">Selecionar roteiro…</option>' + templates.map(template => `<option value="${template.id}">${esc(template.name)}</option>`).join("");
   const validity = new Date(); validity.setDate(validity.getDate() + 10);
   $("#quote-form [name=valid_until]").value = validity.toISOString().slice(0,10);
+  const delivery = new Date(); delivery.setDate(delivery.getDate() + 7);
+  $("#quote-form [name=expected_delivery]").value = delivery.toISOString().slice(0,10);
+  $("#quote-form [name=freight_type]").value = "FOB";
+  renderPendingQuoteItems();
 });
 
-$("#quote-form [name=item_material]").addEventListener("change", event => {
-  const selected = quoteMaterialCatalog.find(item => item.description.toLocaleLowerCase("pt-BR") === event.target.value.toLocaleLowerCase("pt-BR"));
+$("#quote-form [name=item_material_id]").addEventListener("change", event => {
+  const selected = quoteMaterialCatalog.find(item => item.id === event.target.value);
   if (!selected) return;
   $("#quote-form [name=item_thickness]").value = selected.thickness_mm;
 });
 
 function quoteItemFromForm(form) {
   const template = routingTemplates.find(item => item.id === form.routing_template_id);
+  const selectedMaterial = quoteMaterialCatalog.find(item => item.id === form.item_material_id);
   const processes = (template?.steps || []).map((step, index) => ({
     name:step.process,
     minutes:Number(form[`process_minutes_${index}`] || step.default_minutes),
@@ -716,8 +766,9 @@ function quoteItemFromForm(form) {
   }));
   return {
     code:form.item_code, description:form.item_description,
-    quantity:Number(form.item_quantity), material:form.item_material,
-    thickness_mm:form.item_thickness ? Number(form.item_thickness) : null,
+    quantity:Number(form.item_quantity), material:selectedMaterial?.description || "",
+    material_id:selectedMaterial?.id || null,
+    thickness_mm:selectedMaterial?.thickness_mm ?? (form.item_thickness ? Number(form.item_thickness) : null),
     width_mm:form.item_width ? Number(form.item_width) : null,
     length_mm:form.item_length ? Number(form.item_length) : null,
     net_weight_kg:Number(form.item_weight),
@@ -739,12 +790,13 @@ function quoteItemFromForm(form) {
 }
 
 async function engineering() {
-  const [materials, operations, priceHistory] = await Promise.all([req("/catalogs/materials"), req("/catalogs/operations"), req("/catalogs/materials/price-table/history")]);
-  $("#material-catalog").innerHTML = table(["ERP","Material","Esp.","Preço/kg","Status"], materials.map(item => `<tr><td><b>${esc(item.erp_code)}</b></td><td>${esc(item.description)}<br><small>${esc(item.specification)}</small></td><td>${item.thickness_mm} mm</td><td>${money(item.price_per_kg)}</td><td>${pill(item.active ? "ativo" : "inativo")}</td></tr>`));
-  $("#operation-catalog").innerHTML = table(["Código","Operação","Custeio","Valor hora"], operations.map(item => `<tr><td><b>${item.erp_code}</b></td><td>${esc(item.name)}</td><td>${esc(item.pricing_mode)}</td><td>${money(item.hourly_rate)}</td></tr>`));
-  $("#price-import-history").innerHTML = table(["Data","Arquivo","Criados","Atualizados","Sem alteração","Inválidos","Usuário"], priceHistory.map(item=>`<tr><td>${new Date(item.imported_at).toLocaleString("pt-BR")}</td><td><b>${esc(item.filename)}</b></td><td>${item.created}</td><td>${item.updated}</td><td>${item.unchanged}</td><td>${item.invalid}</td><td>${esc(item.imported_by||"—")}</td></tr>`));
-  renderDxfDrafts();
+  const params=new URLSearchParams();
+  [["q","engineering-search"],["process","engineering-process"],["min_weight_kg","engineering-min-weight"],["max_weight_kg","engineering-max-weight"],["min_actual_minutes","engineering-min-time"],["max_actual_minutes","engineering-max-time"]].forEach(([key,id])=>{const value=$("#"+id)?.value.trim();if(value)params.set(key,value);});
+  const rows=await req("/workflows/engineering-intelligence?"+params.toString());
+  $("#engineering-library").innerHTML=rows.length?table(["Item","Cliente / origem","Processos validados","Qtd.","Peso","Tempo real","Custo real da OP","Conclusão"],rows.map(item=>`<tr><td><b>${esc(item.code)}</b><br><small>${esc(item.description)}</small></td><td>${esc(item.client||"—")}<br><small>OP ${esc(item.order_number)} · Orçamento ${esc(item.quote_number||"—")}</small></td><td>${item.processes.map(process=>pill(process)).join(" ")}</td><td>${item.quantity}</td><td>${item.total_weight_kg} kg<br><small>${item.unit_weight_kg} kg/un.</small></td><td><b>${item.actual_minutes} min</b><br><small>${item.actual_minutes_per_unit} min/un.</small></td><td>${money(item.actual_order_cost)}</td><td>${new Date(item.completed_at).toLocaleDateString("pt-BR")}</td></tr>`)):'<div class="empty">Nenhum item concluído atende aos filtros. A biblioteca só aprende com OPs encerradas e com tempo real apontado.</div>';
 }
+$("#engineering-apply").onclick=engineering;
+$("#engineering-clear").onclick=()=>{["engineering-search","engineering-process","engineering-min-weight","engineering-max-weight","engineering-min-time","engineering-max-time"].forEach(id=>$("#"+id).value="");engineering();};
 
 function fileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",",2)[1]);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(file);});}
 function guessPriceColumn(columns,terms){return columns.find(column=>terms.some(term=>column.toLocaleLowerCase("pt-BR").includes(term)))||"";}
@@ -752,7 +804,11 @@ $("#preview-price-table").onclick=async()=>{const form=$("#price-table-form"),fi
 $("#price-table-form").onsubmit=async event=>{event.preventDefault();if(!priceTableSession)return;const form=Object.fromEntries(new FormData(event.target));if(!confirm("Confirmar a criação/atualização dos preços apresentados?"))return;try{const result=await req(`/catalogs/materials/price-table/${priceTableSession}/apply`,{method:"POST",body:JSON.stringify({erp_code_column:form.erp_code_column,price_column:form.price_column,description_column:form.description_column,thickness_column:form.thickness_column,specification_column:form.specification_column,density_column:form.density_column,create_missing:form.create_missing==="true"})});alert(`Importação concluída.\nCriados: ${result.created}\nAtualizados: ${result.updated}\nSem alteração: ${result.unchanged}\nInválidos: ${result.invalid}${result.errors.length?"\n\n"+result.errors.slice(0,8).join("\n"):""}`);$("#price-table-dialog").close();event.target.reset();priceTableSession=null;$("#apply-price-table").disabled=true;await engineering();}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
 
 function renderPendingQuoteItems() {
-  $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) => `<tr><td>${index + 1}</td><td><b>${esc(item.code)}</b><br><small>${esc(item.description)}</small></td><td>${esc(item.material || "—")}${item.thickness_mm ? `<br><small>${item.thickness_mm} mm</small>` : ""}</td><td>${item.quantity}</td><td>${item.margin_percent ?? 30}%</td><td>${item.nesting_mode === "forcar_ncav" ? `NcAv ${item.utilization_percent || "auto"}%` : esc(item.nesting_mode || "automático")}</td><td>${esc(item.routing_template_name || "Sem roteiro")}<br><small>${(item.processes || []).map(process => `${esc(process.name)} ${process.minutes} min`).join(" · ")}</small></td><td class="quote-row-actions"><button type="button" data-edit-item="${index}">Editar</button><button type="button" data-remove-item="${index}">Excluir</button></td></tr>`).join("");
+  const materialOptions=item=>quoteMaterialCatalog.map(material=>`<option value="${material.id}" ${material.id===(item.material_id||quoteMaterialCatalog.find(candidate=>candidate.description===item.material&&Number(candidate.thickness_mm)===Number(item.thickness_mm))?.id)?"selected":""}>${esc(material.description)} · ${material.thickness_mm} mm</option>`).join("");
+  const routeOptions=item=>'<option value="">Sem roteiro</option>'+routingTemplates.map(route=>`<option value="${route.id}" ${route.id===item.routing_template_id?"selected":""}>${esc(route.name)}</option>`).join("");
+  const nestingOptions=item=>[["automatico","Automático"],["forcar_ncav","NcAv"],["desabilitado","Desabilitado"]].map(([value,label])=>`<option value="${value}" ${value===(item.nesting_mode||"automatico")?"selected":""}>${label}</option>`).join("");
+  const hasLaser=item=>(item.processes||[]).some(process=>process.name.toLocaleLowerCase("pt-BR").includes("laser"))||String(item.routing_template_name||"").toLocaleLowerCase("pt-BR").includes("laser");
+  $("#pending-quote-items").innerHTML = pendingQuoteItems.map((item, index) => `<tr><td>${index + 1}</td><td><input data-inline-code="${index}" value="${esc(item.code)}"></td><td><input data-inline-description="${index}" value="${esc(item.description)}"></td><td><input data-inline-quantity="${index}" type="number" min=".01" step=".01" value="${item.quantity}"></td><td><select data-inline-material="${index}">${materialOptions(item)}</select></td><td><input data-inline-width="${index}" type="number" min="0" step=".1" value="${item.width_mm||""}"></td><td><input data-inline-length="${index}" type="number" min="0" step=".1" value="${item.length_mm||""}"></td><td><input data-inline-margin="${index}" type="number" min="0" max="99.99" step=".1" value="${item.margin_percent??30}"></td><td><select data-inline-nesting="${index}">${nestingOptions(item)}</select></td><td><select data-inline-route="${index}">${routeOptions(item)}</select></td><td><input data-inline-laser-additional="${index}" type="number" min="0" step=".1" value="${item.laser_additional_minutes||0}" ${hasLaser(item)?"":"disabled"}></td><td class="quote-price-cell" title="${item.unit_price?`Unitário: ${money(item.unit_price)}`:"Preço calculado ao incluir"}">${item.total_price!==undefined?money(item.total_price):"Calculando…"}</td><td class="quote-row-actions"><button type="button" class="icon-action update" data-update-inline="${index}" title="Atualizar item" aria-label="Atualizar item">↻</button><button type="button" class="icon-action" data-edit-item="${index}" title="Editar detalhes" aria-label="Editar detalhes">✎</button><button type="button" class="icon-action danger" data-remove-item="${index}" title="Excluir item" aria-label="Excluir item">×</button></td></tr>`).join("");
   const quantity = pendingQuoteItems.reduce((sum, item) => sum + Number(item.quantity), 0);
   $("#quote-item-count").textContent = pendingQuoteItems.length;
   $("#quote-summary-count").textContent = pendingQuoteItems.length;
@@ -764,30 +820,40 @@ function renderPendingQuoteItems() {
     renderPendingQuoteItems();
   });
   document.querySelectorAll("[data-edit-item]").forEach(button => button.onclick = () => editQuoteItem(Number(button.dataset.editItem)));
+  document.querySelectorAll("[data-update-inline]").forEach(button=>button.onclick=()=>{const index=Number(button.dataset.updateInline),item=pendingQuoteItems[index],material=quoteMaterialCatalog.find(value=>value.id===$(`[data-inline-material="${index}"]`).value),route=routingTemplates.find(value=>value.id===$(`[data-inline-route="${index}"]`).value);item.code=$(`[data-inline-code="${index}"]`).value;item.description=$(`[data-inline-description="${index}"]`).value;item.quantity=Number($(`[data-inline-quantity="${index}"]`).value);item.width_mm=Number($(`[data-inline-width="${index}"]`).value)||null;item.length_mm=Number($(`[data-inline-length="${index}"]`).value)||null;item.margin_percent=Number($(`[data-inline-margin="${index}"]`).value);item.nesting_mode=$(`[data-inline-nesting="${index}"]`).value;item.laser_additional_minutes=Number($(`[data-inline-laser-additional="${index}"]`).value)||0;item.net_weight_kg=0;item.cut_length_mm=0;item.laser_estimated_minutes=0;if(material){item.material_id=material.id;item.material=material.description;item.thickness_mm=material.thickness_mm;}if(route&&route.id!==item.routing_template_id){item.routing_template_id=route.id;item.routing_template_name=route.name;item.processes=route.steps.map(step=>({name:step.process,minutes:Number(step.default_minutes),hourly_rate:0,external_cost:0}));}renderPendingQuoteItems();});
+  document.querySelectorAll("[data-update-inline]").forEach(button=>button.addEventListener("click",()=>setTimeout(refreshPendingPrices,0)));
+  document.querySelectorAll("[data-remove-item]").forEach(button=>button.addEventListener("click",()=>setTimeout(refreshPendingPrices,0)));
 }
 
 function renderProcessTimes(templateId, values = [], item = {}) {
   const template = routingTemplates.find(value => value.id === templateId);
   const hasLaser = template?.steps.some(step => step.process.toLocaleLowerCase("pt-BR").includes("laser"));
-  const laserFields = hasLaser ? `<label>Perímetro de corte (mm)<input name="item_cut_length" type="number" min="0" step=".1" value="${item.cut_length_mm || 0}"></label><label>Perfurações<input name="item_piercings" type="number" min="0" step="1" value="${item.piercings || 0}"></label><label>Tempo estimado preservado (min)<input name="laser_estimated_minutes" type="number" min="0" step=".001" value="${item.laser_estimated_minutes || 0}" readonly></label><label>Laser adicional (min)<input name="laser_additional_minutes" type="number" min="0" step=".1" value="${item.laser_additional_minutes || 0}"></label><label class="span-2">Motivo do laser adicional<input name="laser_additional_reason" value="${esc(item.laser_additional_reason || "")}" placeholder="Ex.: muitas furações pequenas ou contorno complexo"></label><small class="span-2 muted">O tempo adicional é somado ao tempo calculado, sem apagar a estimativa original.</small>` : "";
+  const laserInput=$("#quote-laser-additional");
+  laserInput.disabled=!hasLaser;
+  laserInput.value=hasLaser?(item.laser_additional_minutes||laserInput.value||0):0;
+  const laserFields = hasLaser ? `<small class="span-2 muted">O perímetro e o tempo-base são calculados automaticamente. Na grade, preencha somente um eventual tempo adicional de laser.</small>` : "";
   const hasBend = template?.steps.some(step => step.process.toLocaleLowerCase("pt-BR").includes("dobra"));
   const quantity = Number(item.quantity || $("#quote-form [name=item_quantity]").value || 1);
   const bendSuggested = quantity<=1?bendTimeSettings.one:quantity<=2?bendTimeSettings.two:quantity<=3?bendTimeSettings.three:quantity<=5?bendTimeSettings.four_to_five:bendTimeSettings.six_plus;
   const bendEstimate = item.bend_estimated_minutes || bendSuggested;
   const bendFields = hasBend ? `<label>Tempo padrão de dobra por peça (min)<input name="bend_estimated_minutes" type="number" min="0" step=".1" value="${bendEstimate}" ${quantity<6?"readonly":""}></label><label>Dobra adicional por peça (min)<input name="bend_additional_minutes" type="number" min="0" step=".1" value="${item.bend_additional_minutes || 0}"></label><label class="span-2">Motivo da dobra adicional<input name="bend_additional_reason" value="${esc(item.bend_additional_reason || "")}" placeholder="Ex.: geometria complexa, múltiplas regulagens ou conferência especial"></label><small class="span-2 muted">Sugestão para ${quantity} peça(s): ${bendSuggested} min por peça. Em lotes de 6 ou mais, o tempo-base pode ser ajustado pelo orçamentista.</small>` : "";
-  $("#quote-process-times").innerHTML = template ? `<div class="process-time-grid">${template.steps.map((step, index) => `<label>${step.operation_erp_code} · ${esc(step.process)} (min)<input name="process_minutes_${index}" type="number" min="0" step=".1" value="${values[index]?.minutes ?? (step.process.toLocaleLowerCase("pt-BR").includes("dobra")?bendEstimate:step.default_minutes)}"></label>`).join("")}${laserFields}${bendFields}</div>` : '<small class="muted">Selecione um roteiro para informar os tempos de processo.</small>';
+  $("#quote-process-times").innerHTML = template ? `<div class="process-time-grid">${template.steps.map((step,index) => step.process.toLocaleLowerCase("pt-BR").includes("laser")?"":`<label>${step.operation_erp_code} · ${esc(step.process)} (min)<input name="process_minutes_${index}" type="number" min="0" step=".1" value="${values.find(value=>value.name===step.process)?.minutes ?? (step.process.toLocaleLowerCase("pt-BR").includes("dobra")?bendEstimate:step.default_minutes)}"></label>`).join("")}${laserFields}${bendFields}</div>` : '<small class="muted">Selecione um roteiro para incluir os processos no cálculo.</small>';
 }
 
 function resetQuoteItemEditor() {
   editingQuoteItemIndex = null;
-  $("#item-editor-title").textContent = "Adicionar item";
-  $("#add-quote-item").textContent = "Adicionar item";
+  $("#add-quote-item").textContent = "＋";
+  $("#add-quote-item").title = "Incluir no orçamento";
+  $("#add-quote-item").setAttribute("aria-label","Incluir no orçamento");
   $("#cancel-item-edit").classList.add("hidden");
-  ["item_code","item_description","item_material","item_thickness","item_weight","item_width","item_length","item_notes","item_utilization"].forEach(name => $("#quote-form [name=" + name + "]").value = "");
+  ["item_code","item_description","item_material_id","item_thickness","item_weight","item_width","item_length","item_notes","item_utilization"].forEach(name => $("#quote-form [name=" + name + "]").value = "");
   $("#quote-form [name=item_quantity]").value = 1;
   $("#quote-form [name=item_margin_percent]").value = 30;
   $("#quote-form [name=nesting_mode]").value = "automatico";
   $("#quote-form [name=routing_template_id]").value = "";
+  $("#quote-laser-additional").value = 0;
+  $("#quote-laser-additional").disabled = true;
+  $("#quote-routing-search").value = "";
   $(".ncav-field").classList.add("hidden");
   renderProcessTimes("");
 }
@@ -796,16 +862,20 @@ function editQuoteItem(index) {
   const item = pendingQuoteItems[index];
   editingQuoteItemIndex = index;
   const form = $("#quote-form");
-  const values = {item_code:item.code,item_description:item.description,item_quantity:item.quantity,item_material:item.material,item_thickness:item.thickness_mm,item_weight:item.net_weight_kg,item_width:item.width_mm,item_length:item.length_mm,item_margin_percent:item.margin_percent,item_utilization:item.utilization_percent,item_notes:item.notes,nesting_mode:item.nesting_mode,routing_template_id:item.routing_template_id};
+  const materialId=item.material_id||quoteMaterialCatalog.find(material=>material.description===item.material&&Number(material.thickness_mm)===Number(item.thickness_mm))?.id||"";
+  const values = {item_code:item.code,item_description:item.description,item_quantity:item.quantity,item_material_id:materialId,item_thickness:item.thickness_mm,item_weight:item.net_weight_kg,item_width:item.width_mm,item_length:item.length_mm,item_margin_percent:item.margin_percent,item_utilization:item.utilization_percent,item_notes:item.notes,nesting_mode:item.nesting_mode,routing_template_id:item.routing_template_id};
   Object.entries(values).forEach(([name, value]) => { if (form.elements[name]) form.elements[name].value = value ?? ""; });
-  $("#item-editor-title").textContent = `Editar item ${index + 1}`;
-  $("#add-quote-item").textContent = "Atualizar item";
+  $("#add-quote-item").textContent = "↻";
+  $("#add-quote-item").title = `Atualizar item ${index + 1}`;
+  $("#add-quote-item").setAttribute("aria-label",`Atualizar item ${index + 1}`);
   $("#cancel-item-edit").classList.remove("hidden");
   $(".ncav-field").classList.toggle("hidden", item.nesting_mode !== "forcar_ncav");
   renderProcessTimes(item.routing_template_id, item.processes, item);
 }
 
 $("#quote-routing-template").onchange = event => renderProcessTimes(event.target.value);
+function routingInitials(name){return name.split("+").map(part=>part.trim()[0]||"").join("").toLocaleUpperCase("pt-BR");}
+$("#quote-routing-search").oninput=event=>{const query=event.target.value.trim().toLocaleUpperCase("pt-BR");if(!query)return;const matches=routingTemplates.filter(template=>routingInitials(template.name).startsWith(query)||template.name.toLocaleUpperCase("pt-BR").startsWith(query));if(matches.length===1||matches.some(template=>routingInitials(template.name)===query)){const selected=matches.find(template=>routingInitials(template.name)===query)||matches[0];$("#quote-routing-template").value=selected.id;renderProcessTimes(selected.id);}};
 function syncCommercialOperation(){const operation=$("#quote-commercial-operation").value,isService=operation==="industrializacao"||operation==="industrializacao_material_terceiros";$("#quote-form").elements.type.value=isService?"servico":"venda";$("#consult-service-history").disabled=!isService;$("#service-history-suggestion").innerHTML=isService?'<small class="muted">A consulta usará somente OPs concluídas com tempo real.</small>':'<small class="muted">Venda possui cálculo previsível; o histórico consultivo é reservado aos serviços.</small>';}
 $("#quote-commercial-operation").onchange=syncCommercialOperation;
 syncCommercialOperation();
@@ -815,10 +885,24 @@ $("#quote-nesting-mode").onchange = event => $(".ncav-field").classList.toggle("
 $("#quote-form [name=expected_delivery]").onchange = renderPendingQuoteItems;
 $("#cancel-item-edit").onclick = resetQuoteItemEditor;
 
+function currentQuotePayload(items=pendingQuoteItems){
+  const form=Object.fromEntries(new FormData($("#quote-form")));
+  return {type:form.type,commercial_operation:form.commercial_operation,billing_unit:form.billing_unit,client_id:form.client_id,requester:form.requester,prepared_by:form.prepared_by,valid_until:form.valid_until,expected_delivery:form.expected_delivery||null,payment_terms:form.payment_terms,freight_type:form.freight_type,discount_value:Number(form.discount_value||0),observations:form.observations,items};
+}
+async function refreshPendingPrices(){
+  if(!pendingQuoteItems.length)return;
+  try{
+    const preview=await req("/commercial/quotes/preview",{method:"POST",body:JSON.stringify(currentQuotePayload())});
+    pendingQuoteItems=pendingQuoteItems.map((item,index)=>({...item,unit_price:preview.items[index].unit_price,total_price:preview.items[index].unit_price,line_total_price:preview.items[index].total_price,total_cost:preview.items[index].total_cost}));
+    $("#quote-entry-price").textContent="—";
+    renderPendingQuoteItems();
+  }catch(error){$("#quote-entry-price").textContent="Erro";$("#quote-entry-price").title=error.message;}
+}
+
 $("#add-quote-item").onclick = () => {
   const form = Object.fromEntries(new FormData($("#quote-form")));
-  if (!form.item_code || !form.item_description || !Number(form.item_quantity)) {
-    $("#quote-form .dialog-error").textContent = "Preencha código, descrição e quantidade do item.";
+  if (!form.item_code || !form.item_description || !Number(form.item_quantity) || !form.item_material_id) {
+    $("#quote-form .dialog-error").textContent = "Preencha código, descrição, quantidade e selecione o material configurado.";
     return;
   }
   const item = quoteItemFromForm(form);
@@ -826,6 +910,7 @@ $("#add-quote-item").onclick = () => {
   else pendingQuoteItems[editingQuoteItemIndex] = item;
   renderPendingQuoteItems();
   resetQuoteItemEditor();
+  refreshPendingPrices();
   $("#quote-form .dialog-error").textContent = "";
 };
 
@@ -837,14 +922,7 @@ $("#quote-form").onsubmit = async event => {
     event.target.querySelector(".dialog-error").textContent = "Adicione pelo menos um item à proposta.";
     return;
   }
-  const payload = {
-    type:form.type, commercial_operation:form.commercial_operation, billing_unit:form.billing_unit, client_id:form.client_id, requester:form.requester,
-    prepared_by:form.prepared_by,
-    valid_until:form.valid_until, expected_delivery:form.expected_delivery || null,
-    payment_terms:form.payment_terms, freight_type:form.freight_type,
-    discount_value:Number(form.discount_value), observations:form.observations,
-    items
-  };
+  const payload = currentQuotePayload(items);
   try {
     try{quoteDirectoryHandle=await chooseQuoteDirectory(quoteSaveMode);}catch(error){if(error.name==="AbortError")return;throw error;}
     const quote=await req("/commercial/quotes", {method:"POST", body:JSON.stringify(payload)});
@@ -868,6 +946,8 @@ $("#maintenance-form").onsubmit = async event => {
   await req("/maintenance", {method:"POST", body:JSON.stringify(data)});
   $("#maintenance-dialog").close(); event.target.reset(); await maintenance();
 };
+
+$("#bom-form").onsubmit=async event=>{event.preventDefault();const values=Object.fromEntries(new FormData(event.target));try{const libraryData=await req("/technical-library"),byCode=new Map(libraryData.items.map(item=>[item.danfer_code.toLocaleLowerCase("pt-BR"),item]));const components=values.components_text.split(/\r?\n/).filter(Boolean).map((line,index)=>{const [code,quantity,unit="un",scrap="0"]=line.split(";").map(value=>value.trim()),part=byCode.get(code.toLocaleLowerCase("pt-BR"));if(!part)throw Error(`Linha ${index+1}: componente ${code} não encontrado na Biblioteca Técnica.`);return{part_id:part.id,quantity:Number(String(quantity).replace(",",".")),unit,scrap_percent:Number(String(scrap).replace(",","."))};});await req("/boms",{method:"POST",body:JSON.stringify({product_id:values.product_id,revision:values.revision,status:values.status,components})});$("#bom-dialog").close();event.target.reset();await bom();}catch(error){event.target.querySelector(".dialog-error").textContent=error.message;}};
 
 $("#routing-template-form").onsubmit = async event => {
   event.preventDefault();
@@ -957,7 +1037,7 @@ $("#password-form").onsubmit = async event => {
 
 async function renderPriceReviewCenter(){let card=$("#price-review-center");if(!card){card=document.createElement("article");card.id="price-review-center";card.innerHTML=`<div class="toolbar"><div><h2>Revisão de preços produzidos</h2><small>Somente itens de OPs concluídas. O histórico original nunca é alterado.</small></div><button type="button" id="filter-price-reviews">Filtrar</button></div><div class="form-grid"><label>Cliente<select id="price-review-client"><option value="">Todos</option></select></label><label>Modalidade<select id="price-review-type"><option value="">Venda e serviço</option><option value="venda">Venda</option><option value="servico">Serviço</option></select></label><label>Produzido desde<input id="price-review-start" type="date"></label><label>Produzido até<input id="price-review-end" type="date"></label><label><input id="price-review-expired" type="checkbox"> Somente vencidos</label></div><div id="price-review-table"></div>`;$("#maintenance").insertBefore(card,$("#maintenance-table").closest("article"));}const clients=await req("/commercial/clients"),select=$("#price-review-client");if(select.options.length===1)select.insertAdjacentHTML("beforeend",clients.map(item=>`<option value="${item.id}">${esc(item.name)}</option>`).join(""));const load=async()=>{const params=new URLSearchParams();if(select.value)params.set("client_id",select.value);if($("#price-review-type").value)params.set("type",$("#price-review-type").value);if($("#price-review-start").value)params.set("start",$("#price-review-start").value);if($("#price-review-end").value)params.set("end",$("#price-review-end").value);if($("#price-review-expired").checked)params.set("expired_only","true");const rows=await req(`/workflows/price-reviews?${params}`);$("#price-review-table").innerHTML=rows.length?table(["Cliente","Item / origem","Último lote","Validade","Preço histórico","Referência atual","Ação"],rows.map((item,index)=>`<tr><td>${esc(item.client)}<br><small>${esc(item.quote_type)}</small></td><td><b>${esc(item.item_code)}</b> · ${esc(item.description)}<br><small>${esc(item.quote_number)} / ${esc(item.order_number)}</small></td><td>${item.quantity} pç · ${item.total_weight_kg} kg<br><small>${item.produced_on}</small></td><td>${item.validity_days} dias<br>${pill(item.expired?"vencido":"vigente")}</td><td>${money(item.historical_unit_price)}</td><td>${money(item.current_reference_price)}${item.last_adjustment_date?`<br><small>${item.last_adjustment_date}</small>`:""}</td><td><button type="button" data-price-review="${index}">Reajustar</button></td></tr>`)):'<div class="empty">Nenhum item produzido encontrado para os filtros.</div>';document.querySelectorAll("[data-price-review]").forEach(button=>button.onclick=async()=>{const item=rows[Number(button.dataset.priceReview)],value=prompt(`Novo preço unitário para ${item.item_code}:`,item.current_reference_price);if(value===null)return;const newPrice=Number(String(value).replace(",","."));if(!(newPrice>0))return alert("Informe um preço válido.");const reason=prompt("Motivo do reajuste:",item.expired?"Revisão por validade vencida":"Revisão administrativa");if(!reason)return;await req("/commercial/price-adjustments",{method:"POST",body:JSON.stringify({client_id:item.client_id,item_code:item.item_code,commercial_operation:item.commercial_operation,previous_unit_price:item.current_reference_price,new_unit_price:newPrice,reason,effective_date:new Date().toISOString().slice(0,10)})});await load();});};$("#filter-price-reviews").onclick=load;await load();}
 
-const recoveredMaintenanceLabels={commercialParameters:"Parâmetros comerciais v0.51",laserParameters:"Laser",models:"Modelos de fabricação",processes:"Processos",standardSheets:"Chapas padrão",utilizationIncrements:"Aproveitamento automático",largePieceLossRules:"Perda peça unitária",taxScenarios:"Tributação",operationNatures:"Operações e ERP",crmStages:"CRM · Etapas",crmActivities:"CRM · Atividades",crmLossReasons:"CRM · Motivos",crmRules:"CRM · Regras"};
+const recoveredMaintenanceLabels={paymentTerms:"Condições de pagamento",commercialParameters:"Parâmetros comerciais v0.51",laserParameters:"Laser",models:"Modelos de fabricação",processes:"Processos",standardSheets:"Chapas padrão",utilizationIncrements:"Aproveitamento automático",largePieceLossRules:"Perda peça unitária",taxScenarios:"Tributação",operationNatures:"Operações e ERP",crmStages:"CRM · Etapas",crmActivities:"CRM · Atividades",crmLossReasons:"CRM · Motivos",crmRules:"CRM · Regras"};
 async function renderRecoveredMaintenance(){let card=$("#recovered-maintenance-card");if(!card){card=document.createElement("article");card.id="recovered-maintenance-card";card.innerHTML=`<div class="toolbar"><div><h2>Cadastros recuperados da v0.51</h2><small>Configurações administrativas consolidadas a partir da versão de referência.</small></div><button type="button" id="reset-recovered-maintenance" class="cancel">Restaurar v0.51</button></div><div id="recovered-maintenance-tabs" class="maintenance-tabs"></div><div id="recovered-maintenance-editor"></div>`;$("#maintenance").insertBefore(card,$("#material-cost-settings-card")||$("#routing-settings-card"));}const categories=await req("/maintenance-config/categories"),names=Object.keys(recoveredMaintenanceLabels).filter(name=>categories[name]!==undefined);let active=card.dataset.activeCategory||names[0];const tabs=$("#recovered-maintenance-tabs"),editor=$("#recovered-maintenance-editor");tabs.innerHTML=names.map(name=>`<button type="button" data-maint-category="${name}" class="${name===active?"active":""}">${recoveredMaintenanceLabels[name]} <small>${categories[name]}</small></button>`).join("");const open=async name=>{card.dataset.activeCategory=name;tabs.querySelectorAll("button").forEach(button=>button.classList.toggle("active",button.dataset.maintCategory===name));const rows=await req(`/maintenance-config/${name}`),keys=[...new Set(rows.flatMap(row=>Object.keys(row)))];const input=(value,key,index)=>`<input data-recovered-row="${index}" data-recovered-key="${esc(key)}" value="${esc(value??"")}">`;editor.innerHTML=`<div class="table-wrap wide-admin-table"><table><thead><tr>${keys.map(key=>`<th>${esc(key)}</th>`).join("")}<th>Ação</th></tr></thead><tbody>${rows.map((row,index)=>`<tr>${keys.map(key=>`<td>${input(row[key],key,index)}</td>`).join("")}<td><button type="button" class="cancel" data-remove-recovered>Excluir</button></td></tr>`).join("")}</tbody></table></div><p><button type="button" id="add-recovered-row">+ Adicionar linha</button> <button type="button" id="save-recovered-maintenance">Salvar ${recoveredMaintenanceLabels[name]}</button> <span id="recovered-maintenance-status"></span></p>`;const bindRemove=()=>editor.querySelectorAll("[data-remove-recovered]").forEach(button=>button.onclick=()=>button.closest("tr").remove());bindRemove();$("#add-recovered-row").onclick=()=>{editor.querySelector("tbody").insertAdjacentHTML("beforeend",`<tr>${keys.map(key=>`<td>${input("",key,rows.length)}</td>`).join("")}<td><button type="button" class="cancel" data-remove-recovered>Excluir</button></td></tr>`);bindRemove();};$("#save-recovered-maintenance").onclick=async()=>{const saved=[...editor.querySelectorAll("tbody tr")].map(tr=>Object.fromEntries([...tr.querySelectorAll("input")].map(field=>{const original=rows[Number(field.dataset.recoveredRow)]?.[field.dataset.recoveredKey],value=field.value;return [field.dataset.recoveredKey,typeof original==="number"?Number(value):value]})));await req(`/maintenance-config/${name}`,{method:"PUT",body:JSON.stringify(saved)});$("#recovered-maintenance-status").textContent="Cadastro salvo.";await renderRecoveredMaintenance();};};tabs.querySelectorAll("button").forEach(button=>button.onclick=()=>open(button.dataset.maintCategory));$("#reset-recovered-maintenance").onclick=async()=>{if(!confirm("Restaurar todos os cadastros aos valores recuperados da v0.51?"))return;await req("/maintenance-config/reset/v051",{method:"POST"});card.dataset.activeCategory="";await renderRecoveredMaintenance();};await open(active);}
 
 (async () => {

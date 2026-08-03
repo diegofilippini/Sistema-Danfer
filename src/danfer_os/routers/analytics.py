@@ -29,11 +29,26 @@ def create_router(commercial: CommercialService, pcp: PcpService, operations: Op
         result = []
         for order in pcp.list():
             cost = pcp.costs(order.id)
+            quote = None
+            if order.source_quote_id:
+                try:
+                    quote = commercial.get_quote(order.source_quote_id)
+                except Exception:
+                    quote = None
+            codes = {item.code.casefold() for item in order.production_items}
+            revenue = round(sum(item.total_price for item in quote.items if item.code.casefold() in codes), 2) if quote else 0
+            actual_margin = round((revenue - cost.actual_total_cost) / revenue * 100, 2) if revenue else None
+            estimated_margin = round((revenue - cost.estimated_total_cost) / revenue * 100, 2) if revenue else None
             result.append({
                 **cost.model_dump(mode="json"),
                 "due_date": order.due_date,
                 "priority": order.priority,
                 "status": order.status.value,
+                "quote_number": quote.number if quote else "",
+                "quoted_revenue": revenue,
+                "estimated_margin_percent": estimated_margin,
+                "actual_margin_percent": actual_margin,
+                "margin_impact_percent": round(actual_margin - estimated_margin, 2) if actual_margin is not None and estimated_margin is not None else None,
                 "reason": "custo realizado acima do previsto" if cost.variance_value > 0 else "dentro ou abaixo do previsto",
             })
         return result

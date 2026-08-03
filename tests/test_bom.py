@@ -62,3 +62,20 @@ def test_bom_rejects_self_reference_and_unknown_parts() -> None:
         json={"product_id": product, "components": [{"part_id": product, "quantity": 1}]},
     )
     assert self_reference.status_code == 422
+
+
+def test_bom_is_persisted_between_application_restarts(tmp_path) -> None:
+    first = TestClient(create_app(data_dir=tmp_path))
+    product = create_part(first, "KIT-PERSIST")
+    raw = create_part(first, "MP-PERSIST")
+    created = first.post(
+        "/api/v1/boms",
+        json={"product_id": product, "status": "ativa", "components": [{"part_id": raw, "quantity": 4}]},
+    )
+    assert created.status_code == 201
+
+    second = TestClient(create_app(data_dir=tmp_path))
+    listed = second.get("/api/v1/boms")
+    assert listed.status_code == 200
+    assert listed.json()[0]["id"] == created.json()["id"]
+    assert listed.json()[0]["components"][0]["quantity"] == 4

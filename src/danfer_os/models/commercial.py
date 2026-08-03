@@ -26,7 +26,19 @@ class ClientCreate(BaseModel):
     email: str = Field(default="", max_length=160)
     phone: str = Field(default="", max_length=30)
     address: str = Field(default="", max_length=300)
+    address_number: str = Field(default="", max_length=30)
+    address_complement: str = Field(default="", max_length=100)
+    district: str = Field(default="", max_length=100)
+    city: str = Field(default="", max_length=100)
+    state: str = Field(default="", max_length=2)
+    postal_code: str = Field(default="", max_length=12)
+    country_code: str = Field(default="BR", max_length=3)
+    municipal_registration: str = Field(default="", max_length=30)
+    suframa_registration: str = Field(default="", max_length=30)
+    tax_email: str = Field(default="", max_length=160)
     payment_terms: str = Field(default="28 dias", max_length=100)
+    payment_condition_erp_code: str = Field(default="", max_length=50)
+    credit_limit: float = Field(default=0, ge=0)
     freight_type: FreightType = FreightType.FOB
     freight_payer: FreightPayer = FreightPayer.CUSTOMER
     tax_regime: str = Field(default="normal", max_length=80)
@@ -43,7 +55,19 @@ class ClientUpdate(BaseModel):
     email: str | None = Field(default=None, max_length=160)
     phone: str | None = Field(default=None, max_length=30)
     address: str | None = Field(default=None, max_length=300)
+    address_number: str | None = Field(default=None, max_length=30)
+    address_complement: str | None = Field(default=None, max_length=100)
+    district: str | None = Field(default=None, max_length=100)
+    city: str | None = Field(default=None, max_length=100)
+    state: str | None = Field(default=None, max_length=2)
+    postal_code: str | None = Field(default=None, max_length=12)
+    country_code: str | None = Field(default=None, max_length=3)
+    municipal_registration: str | None = Field(default=None, max_length=30)
+    suframa_registration: str | None = Field(default=None, max_length=30)
+    tax_email: str | None = Field(default=None, max_length=160)
     payment_terms: str | None = Field(default=None, max_length=100)
+    payment_condition_erp_code: str | None = Field(default=None, max_length=50)
+    credit_limit: float | None = Field(default=None, ge=0)
     freight_type: FreightType | None = None
     freight_payer: FreightPayer | None = None
     tax_regime: str | None = Field(default=None, max_length=80)
@@ -114,10 +138,13 @@ class AppliedNestingPlan(BaseModel):
 
 class QuoteItemCreate(BaseModel):
     code: str = Field(min_length=1, max_length=60)
+    erp_product_code: str = Field(default="", max_length=60)
     description: str = Field(min_length=2, max_length=200)
     quantity: float = Field(gt=0)
     unit: str = Field(default="un", min_length=1, max_length=20)
     material: str = Field(default="", max_length=100)
+    ncm: str = Field(default="", max_length=10)
+    cest: str = Field(default="", max_length=10)
     thickness_mm: float | None = Field(default=None, gt=0)
     width_mm: float | None = Field(default=None, gt=0)
     length_mm: float | None = Field(default=None, gt=0)
@@ -166,6 +193,8 @@ class QuoteCreate(BaseModel):
     billing_unit: CompanyUnit = CompanyUnit.DANFER
     client_id: UUID
     requester: str = Field(default="", max_length=120)
+    customer_purchase_order: str = Field(default="", max_length=100)
+    seller_erp_code: str = Field(default="", max_length=50)
     prepared_by: str = Field(default="Equipe Comercial Danfer", max_length=120)
     valid_until: date
     expected_delivery: date | None = None
@@ -173,6 +202,13 @@ class QuoteCreate(BaseModel):
     freight_type: FreightType = FreightType.FOB
     freight_payer: FreightPayer = FreightPayer.CUSTOMER
     nature_operation: str = Field(default="Venda de produção", max_length=120)
+    nature_operation_erp_code: str = Field(default="", max_length=50)
+    cfop: str = Field(default="", max_length=10)
+    cst_icms: str = Field(default="", max_length=5)
+    cst_ipi: str = Field(default="", max_length=5)
+    cst_pis: str = Field(default="", max_length=5)
+    cst_cofins: str = Field(default="", max_length=5)
+    carrier_erp_code: str = Field(default="", max_length=50)
     tax_scenario: str = Field(default="padrao", max_length=80)
     margin_percent: float | None = Field(default=None, ge=0, lt=100)
     ipi_percent: float | None = Field(default=None, ge=0, le=100)
@@ -189,6 +225,8 @@ class QuoteUpdate(BaseModel):
     commercial_operation: CommercialOperation | None = None
     billing_unit: CompanyUnit | None = None
     requester: str | None = Field(default=None, max_length=120)
+    customer_purchase_order: str | None = Field(default=None, max_length=100)
+    seller_erp_code: str | None = Field(default=None, max_length=50)
     prepared_by: str | None = Field(default=None, max_length=120)
     valid_until: date | None = None
     expected_delivery: date | None = None
@@ -196,6 +234,13 @@ class QuoteUpdate(BaseModel):
     freight_type: FreightType | None = None
     freight_payer: FreightPayer | None = None
     nature_operation: str | None = Field(default=None, max_length=120)
+    nature_operation_erp_code: str | None = Field(default=None, max_length=50)
+    cfop: str | None = Field(default=None, max_length=10)
+    cst_icms: str | None = Field(default=None, max_length=5)
+    cst_ipi: str | None = Field(default=None, max_length=5)
+    cst_pis: str | None = Field(default=None, max_length=5)
+    cst_cofins: str | None = Field(default=None, max_length=5)
+    carrier_erp_code: str | None = Field(default=None, max_length=50)
     tax_scenario: str | None = Field(default=None, max_length=80)
     margin_percent: float | None = Field(default=None, ge=0, lt=100)
     ipi_percent: float | None = Field(default=None, ge=0, le=100)

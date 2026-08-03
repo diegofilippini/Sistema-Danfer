@@ -36,8 +36,10 @@ DEFAULT_OPERATION_COSTS = {
 }
 
 DEFAULT_ROUTING_TEMPLATES = (
-    ("Corte Laser", [(2, "Corte Laser", 5)]),
-    ("Corte + Dobra", [(2, "Corte Laser", 5), (5, "Dobra", 5)]),
+    ("Laser", [(2, "Corte Laser", 0)]),
+    ("Laser + Dobra", [(2, "Corte Laser", 0), (5, "Dobra", 5)]),
+    ("Laser + Dobra + Calandra", [(2, "Corte Laser", 0), (5, "Dobra", 5), (6, "Calandra", 8)]),
+    ("Corte + Dobra", [(2, "Corte Laser", 0), (5, "Dobra", 5)]),
     ("Corte + Calandra", [(2, "Corte Laser", 5), (6, "Calandra", 8)]),
     ("Corte + Dobra + Solda", [(2, "Corte Laser", 5), (5, "Dobra", 5), (9, "Solda", 10)]),
     ("Guilhotina + Dobra", [(3, "Guilhotina", 4), (5, "Dobra", 5)]),
@@ -72,7 +74,27 @@ class CatalogService:
             )]
         }
         self._load()
+        self._ensure_primary_routing_templates()
         self._seed_v051()
+
+    def _ensure_primary_routing_templates(self) -> None:
+        required = DEFAULT_ROUTING_TEMPLATES[:3]
+        existing_names = {item.name.casefold() for item in self._routing_templates.values()}
+        changed = False
+        for name, raw_steps in required:
+            if name.casefold() in existing_names:
+                continue
+            template = RoutingTemplate(
+                name=name,
+                description="Roteiro principal para seleção rápida no orçamento.",
+                steps=[RoutingTemplateStep(
+                    operation_erp_code=code, process=process, default_minutes=minutes
+                ) for code, process, minutes in raw_steps],
+            )
+            self._routing_templates[template.id] = template
+            changed = True
+        if changed:
+            self._save()
 
     def _seed_v051(self) -> None:
         """Recupera os cadastros aprovados da v0.51 somente quando não há dados atuais."""
@@ -153,6 +175,28 @@ class CatalogService:
             self._materials[material.id] = material
             self._save()
         return material.model_copy(deep=True)
+
+    def seed_legacy_materials(self, rows: list[dict]) -> int:
+        """Importa o cadastro histórico somente quando o catálogo ainda está vazio."""
+        if self._materials:
+            return 0
+        created = 0
+        for row in rows:
+            density = float(row.get("densidade") or 7850)
+            if density < 5000:  # corrige registros históricos digitados como 780
+                density = 7850
+            self.create_material(MaterialCreate(
+                erp_code=str(row.get("codigoERP") or f"LEG-{created + 1}"),
+                description=str(row.get("material") or "Material"),
+                specification=str(row.get("descricao") or ""),
+                thickness_mm=float(row.get("espessura") or 0),
+                price_per_kg=float(row.get("valorKg") or 0),
+                density_kg_m3=density,
+                laser_speed_mm_min=float(row.get("velLaser") or 0),
+                plasma_speed_mm_min=float(row.get("velPlasma") or 0),
+            ))
+            created += 1
+        return created
 
     def list_materials(self, query: str = "", active: bool | None = None) -> list[Material]:
         needle = query.strip().casefold()
@@ -298,7 +342,10 @@ class CatalogService:
         items = list(self._routing_templates.values())
         if active is not None:
             items = [item for item in items if item.active is active]
-        return [item.model_copy(deep=True) for item in sorted(items, key=lambda item: item.name)]
+        primary = {"laser": 0, "laser + dobra": 1, "laser + dobra + calandra": 2}
+        return [item.model_copy(deep=True) for item in sorted(
+            items, key=lambda item: (primary.get(item.name.casefold(), 99), item.name)
+        )]
 
     def create_routing_template(self, data: RoutingTemplateCreate) -> RoutingTemplate:
         with self._lock:
